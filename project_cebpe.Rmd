@@ -19,7 +19,7 @@ knitr::opts_chunk$set(echo=T, include = T, warning=FALSE, message=FALSE, tidy = 
 # ```
 
 #### Load libraries
-```{r}
+```{r setup}
 PWD="/home/pundhir/project/chip-seq-analysis/analysis_cebpe"
 library(preprocessCore)
 library(edgeR)
@@ -205,7 +205,7 @@ dev.off()
 #### write to file information on ROBUST, BAD and EXTRA samples
 ```{r}
 ## sample statistics
-## total: 120; bad: 31; extra: 19; analyzed: 70 (total-bad-extra)
+## total: 120; bad: 31; extra: 14; analyzed: 75 (total-bad-extra)
 
 expr_data_all_marked <- expr_data_all
 
@@ -673,20 +673,21 @@ plot(Venn(list(genes_cebpe[which(genes_cebpe$e2f > 0 & genes_cebpe$cebpe_lpmmy >
 write.table(genes_cebpe, "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/genes_cebpe.bed", sep="\t", quote = F, row.names = F, col.names = T)
 # write.table(genes_cebpe, "/home/pundhir/project/chip-seq-analysis/data/gene/cebpe/GENE_EXPRESSION.MATRIX", sep="\t", quote = F, row.names = F, col.names = T)
 # write.table(genes_cebpe, "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/GENE_EXPRESSION.MATRIX", sep="\t", quote = F, row.names = F, col.names = T)
+write.table(genes_cebpe[,c(1:58,83:93,104:114,117:124)], "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/xls/data_genes.xls", sep="\t", quote = F, row.names = F, col.names = T)
 ```
 
 #### plot gene expression profile as heatmaps
 ```{r, eval=FALSE}
 heatmap_lst <- list()
-heatmap_lst[[1]] <- matrix2pheatmap(genes_cebpe[,c(8:9,11:26)], genes_cebpe$cluster, "row", colorRampPalette(c("dodgerblue4", "#2171b5", "grey97", "#fc8d59", "sienna3"), bias=1)(256))[[4]]
-heatmap_lst[[2]] <- matrix2pheatmap(genes_cebpe[,c(28:29,31:46)], genes_cebpe$cluster, "row", colorRampPalette(c("dodgerblue4", "#2171b5", "grey97", "#fc8d59", "sienna3"), bias=1)(256))[[4]]
-heatmap_lst[[3]] <- matrix2pheatmap(genes_cebpe[grep("Cebpa|Cebpe", genes_cebpe$gene),c(8:9,11:22)], c(1,1), "row", colorRampPalette(c("dodgerblue4", "#2171b5", "grey97", "#fc8d59", "sienna3"), bias=1)(256))[[4]]
-heatmap_lst[[4]] <- matrix2pheatmap(genes_cebpe[grep("Cebpa|Cebpe", genes_cebpe$gene),c(28:29,31:42)], c(1,1), "row", colorRampPalette(c("dodgerblue4", "#2171b5", "grey97", "#fc8d59", "sienna3"), bias=1)(256))[[4]]
+heatmap_lst[[1]] <- matrix2pheatmap(genes_cebpe[,c(8:9,10,11:26)], genes_cebpe$cluster, "row", colorRampPalette(c("dodgerblue4", "#2171b5", "grey97", "#fc8d59", "sienna3"), bias=1)(256))[[4]]
+heatmap_lst[[2]] <- matrix2pheatmap(genes_cebpe[,c(28:29,30,31:46)], genes_cebpe$cluster, "row", colorRampPalette(c("dodgerblue4", "#2171b5", "grey97", "#fc8d59", "sienna3"), bias=1)(256))[[4]]
+heatmap_lst[[3]] <- matrix2pheatmap(genes_cebpe[grep("Cebpa|Cebpe", genes_cebpe$gene),c(8:9,10,11:22)], c(1,1), "row", colorRampPalette(c("dodgerblue4", "#2171b5", "grey97", "#fc8d59", "sienna3"), bias=1)(256))[[4]]
+heatmap_lst[[4]] <- matrix2pheatmap(genes_cebpe[grep("Cebpa|Cebpe", genes_cebpe$gene),c(28:29,30,31:42)], c(1,1), "row", colorRampPalette(c("dodgerblue4", "#2171b5", "grey97", "#fc8d59", "sienna3"), bias=1)(256))[[4]]
 # heatmap_lst[[3]] <- matrix2pheatmap(mat_raw[(rownames(mat_raw) %in% GENES_DE), c(2,3,5:(ncol(mat_raw)-1))], mat_raw[rownames(mat_raw) %in% GENES_DE,]$cluster, "row", colorRampPalette(c("dodgerblue4", "#2171b5", "grey97", "#fc8d59", "sienna3"), bias=1)(256))[[4]]
 
 pdf("/home/pundhir/project/chip-seq-analysis/analysis_cebpe/pdf/heatmap_gene_expression.pdf", width=10)
 gHeatmap <- grid.arrange(arrangeGrob(grobs= heatmap_lst[c(1,2)],ncol=2))
-matrix2Heatmap(genes_cebpe[,c(8:9,11:26)], genes_cebpe$cluster, "row", colorRampPalette(c("dodgerblue4", "#2171b5", "grey97", "#fc8d59", "sienna3"), bias=1)(256))
+matrix2Heatmap(genes_cebpe[,c(8:9,10,11:26)], genes_cebpe$cluster, "row", colorRampPalette(c("dodgerblue4", "#2171b5", "grey97", "#fc8d59", "sienna3"), bias=1)(256))
 dev.off()
 
 pdf("/home/pundhir/project/chip-seq-analysis/analysis_cebpe/pdf/heatmap_cebpAE_expression.pdf", width=10)
@@ -750,7 +751,7 @@ pdf("/home/pundhir/project/chip-seq-analysis/analysis_cebpe/pdf/heatmap_gene_exp
                                    e2f_dis = c("1" = "#33a02c", "0" = "#ffffff")
                                    )
                         )
-      print(Heatmap(as.matrix(t(scale(t(mat_int[,c(8:9,11:22)])))), cluster_rows=F, cluster_columns=F, col=colorRampPalette(c("dodgerblue4","grey97", "sienna3"), bias=1.5)(250), use_raster=T, show_row_names = F, raster_device="tiff", raster_quality = 10, left_annotation = la, right_annotation = ra))
+      print(Heatmap(as.matrix(t(scale(t(mat_int[,c(8:9,10,11:22)])))), cluster_rows=F, cluster_columns=F, col=colorRampPalette(c("dodgerblue4","grey97", "sienna3"), bias=1.5)(250), use_raster=T, show_row_names = F, raster_device="tiff", raster_quality = 10, left_annotation = la, right_annotation = ra))
   } else if(i==3) {
       mat_int <- genes_cebpe[which(genes_cebpe$cell_cycle=="cell_cycle" & grepl("A_epm|B_lpm", genes_cebpe$cluster_deRefined)),]
       #mat_int <- mat_int[!is.na(mat_int$funcClass),]
@@ -817,7 +818,7 @@ pdf("/home/pundhir/project/chip-seq-analysis/analysis_cebpe/pdf/heatmap_gene_exp
                         )
       #print(Heatmap(as.matrix(t(scale(t(mat_int[,c(8:9,11:22)])))), cluster_rows=F, cluster_columns=F, col=colorRampPalette(c("dodgerblue4","grey97", "sienna3"), bias=1.5)(250), use_raster=T, show_row_names = F, raster_device="tiff", raster_quality = 10, left_annotation = la, right_annotation = ra))
       ha = HeatmapAnnotation(summary = anno_summary(gp = gpar(fill = c(2,2,3,3)),  height = unit(2, "cm")))
-      print(Heatmap(as.matrix(t(scale(t(mat_int[,c(8:9,11:22)])))), cluster_rows=F, cluster_columns=F,
+      print(Heatmap(as.matrix(t(scale(t(mat_int[,c(8:9,10,11:22)])))), cluster_rows=F, cluster_columns=F,
               col=colorRampPalette(c("dodgerblue4","grey97", "sienna3"), bias=1.5)(250), use_raster=T, show_row_names = F,
               raster_device="tiff", raster_quality = 10, left_annotation = la, right_annotation = ra, 
               row_split = mat_int$cluster_deRefined) +
@@ -976,15 +977,19 @@ p[[5]] <- ggplot(as.data.frame(table(genes_cebpe[grepl("G1_S|G2_M", genes_cebpe$
 
 p[[6]] <- ggplot((melt(summaryBy(myc_chip ~ cluster, data = genes_cebpe, FUN=list(median)))), aes(variable, cluster, fill= value)) + 
   geom_tile() + ylab("") + scale_x_discrete(position="right") +
-  scale_fill_gradientn(colours = (colorRampPalette(brewer.pal(9, col), bias=0.2)(256))) + theme_bw() +
+  scale_fill_gradientn(colours = (colorRampPalette(brewer.pal(9, "Blues"), bias=0.2)(256))) + theme_bw() +
   theme(legend.position="none", legend.text = element_text(size=6), axis.text.y = element_text(angle = -90, hjust = 1)) +
   coord_flip() + xlab("")
 
 p[[7]] <- ggplot((melt(summaryBy(e2f_chip ~ cluster, data = genes_cebpe, FUN=list(median)))), aes(variable, cluster, fill= value)) + 
   geom_tile() + ylab("") + scale_x_discrete(position="right") +
-  scale_fill_gradientn(colours = (colorRampPalette(brewer.pal(9, col), bias=0.2)(256))) + theme_bw() +
+  scale_fill_gradientn(colours = (colorRampPalette(brewer.pal(9, "Blues"), bias=0.2)(256))) + theme_bw() +
   theme(legend.position="none", legend.text = element_text(size=6), axis.text.y = element_text(angle = -90, hjust = 1)) +
   coord_flip() + xlab("")
+
+p[[6]] <- ggline(genes_cebpe, x = "cluster", y = "myc_chip", add = c("mean_se"))
+
+p[[7]] <- ggline(genes_cebpe, x = "cluster", y = "e2f_chip", add = c("mean_se"))
 
 ggarrange(ggplot(genes_cebpe[grep("A_epm|B_lpm", genes_cebpe$cluster_deRefined),], aes(cluster_deRefined, log(myc_chip))) + geom_boxplot() + 
             theme(legend.position="none", legend.text = element_text(size=6), axis.text.x = element_text(angle = 45, hjust = 1)),
@@ -1121,7 +1126,7 @@ gDEProfileNeutral <- ggarrange(plotlist = p, ncol=3, nrow=3)
 #   theme(legend.position="top")
 
 test <- genes_cebpe[,c("cebpe_lpmmy", "e2f_chip", "myc_chip", "cluster", "cluster_de", "cluster_deRefined")]
-test <- test[which(test$cluster_deRefined!="F_rest_neutral"),]
+test <- test[which(test$cluster_deRefined!="F_rest-neutral"),]
 test$cluster_de <- gsub("-.*", "", test$cluster_deRefined)
 test$cluster_deRefined <- gsub(".*-", "", test$cluster_deRefined)
 test <- test[which(test$cluster_de!="F_rest"),]
@@ -1152,10 +1157,13 @@ p3 <- ggplot(t.melt, aes(cluster_de, cebpe_lpmmy, color=cluster_deRefined)) +
     scale_color_manual(values=c("#a50026", "#000000")) +
     theme_bw() + theme(legend.position="top") + ylim(c(0,6))
 
+# ggline(test[which(test$cebpe_lpmmy<6),], x="cluster_de", y="cebpe_lpmmy", add = c("mean_se"), color="cluster_deRefined",
+#                  palette=c("#a50026", "#000000"), point.color="gray")
+
 test <- genes_cebpe[,c("cebpe_lpmmy_dis", "cluster_de", "cluster_deRefined", "enhancer_count")]
 test$cebpe_lpmmy_dis <- test$cebpe_lpmmy_dis/test$enhancer_count
 test[is.na(test)] <- 0
-test <- test[which(test$cluster_deRefined!="F_rest_neutral"),]
+test <- test[which(test$cluster_deRefined!="F_rest-neutral"),]
 test$cluster_de <- gsub("-.*", "", test$cluster_deRefined)
 test$cluster_deRefined <- gsub(".*-", "", test$cluster_deRefined)
 test <- test[which(test$cluster_de!="F_rest"),]
@@ -1319,12 +1327,13 @@ p[[4]] <- plot(importance, main="regression (log2FC): B_lpm")
 gDEWithTFRank <- ggarrange(arrangeGrob(grobs=p, ncol=2))
 
 #---------------------------------------------------------------------#
-
-df.melt <- melt(expr_data_norm_with_replicates[grep("^Myc$|^Cebpa$|^Cebpe$|^E2f4$|^Nfyb$|^Lin54$|^Rb1$|^E2f7$|^E2f8$", expr_data_norm_with_replicates$GeneID),
+#^Chd4$|^H3f3a$|^H2afz$|^Ezh2$|^Smarca4$|^Tet2$|^Rb1$|^Cdk12$|^Dnmt3a$|^Med1$|^Ep400$|^Ep300$|^Ppp2ca$
+#enhancer candidates: ^Pik3c2b$|^Cpne3$|^Zdhhc18$|^Zcwpw1$|^Lrrc28$|^Igf1r$|^Tgm4$|^Traf4$|^Tst$|^Igsf5$
+df.melt <- melt(expr_data_norm_with_replicates[grep("^Cebpa$|^Cebpe$|^E2f1$|^E2f7$|^E2f8$|^Lin54$|^Myc$|^Nfyb$|^Rb1$", expr_data_norm_with_replicates$GeneID),
                                c("GeneID",
                                  grep("lsk_.*wt", colnames(expr_data_norm_with_replicates), value = T),
                                  grep("pregm_.*wt", colnames(expr_data_norm_with_replicates), value = T),
-                                 #grep("gmp_.*wt|gmpG.*wt", colnames(expr_data_norm_with_replicates), value = T),
+                                 grep("gmp_.*wt|gmpG.*wt", colnames(expr_data_norm_with_replicates), value = T),
                                  grep("gmpG.*wt", colnames(expr_data_norm_with_replicates), value = T),
                                  grep("epm_.*wt", colnames(expr_data_norm_with_replicates), value = T),
                                  grep("lpm_.*wt", colnames(expr_data_norm_with_replicates), value = T),
@@ -1401,6 +1410,77 @@ barplot(genes_cebpe[grep("^Mxd1$|^Myc$|^Max$", genes_cebpe$gene),c(4,84:91)]$log
         names.arg=genes_cebpe[grep("^Mxd1$|^Myc$|^Max$", genes_cebpe$gene),c(4,84:91)]$gene, las=2)
 res_mm[grep("^Mxd1$|^Myc$|^Max$", res_mm$gene),]
 sprintf("%E", res_mm[grep("^Mxd1$|^Myc$|^Max$", res_mm$gene),]$padj)
+
+pdf("/home/pundhir/project/chip-seq-analysis/analysis_cebpe/pdf/genes_expr_se_points_plots.pdf")
+df.melt <- melt(expr_data_norm_with_replicates[grep("^Cebpa$|^Cebpe$|^E2f1$|^E2f7$|^E2f8$|^Lin54$|^Myc$|^Nfyb$|^Rb1$", expr_data_norm_with_replicates$GeneID),
+                               c("GeneID",
+                                 grep("lsk_.*wt", colnames(expr_data_norm_with_replicates), value = T),
+                                 grep("pregm_.*wt", colnames(expr_data_norm_with_replicates), value = T),
+                                 grep("gmp_.*wt|gmpG.*wt", colnames(expr_data_norm_with_replicates), value = T),
+                                 grep("gmpG.*wt", colnames(expr_data_norm_with_replicates), value = T),
+                                 grep("epm_.*wt", colnames(expr_data_norm_with_replicates), value = T),
+                                 grep("lpm_.*wt", colnames(expr_data_norm_with_replicates), value = T),
+                                 grep("my_.*wt", colnames(expr_data_norm_with_replicates), value = T),
+                                 grep("mm_.*wt", colnames(expr_data_norm_with_replicates), value = T),
+                                 grep("bc_.*wt", colnames(expr_data_norm_with_replicates), value = T),
+                                 grep("pmn_.*wt", colnames(expr_data_norm_with_replicates), value = T),
+                                 grep("gmpG_.*ko", colnames(expr_data_norm_with_replicates), value = T),
+                                 grep("epm_.*ko", colnames(expr_data_norm_with_replicates), value = T),
+                                 grep("lpm_.*ko", colnames(expr_data_norm_with_replicates), value = T),
+                                 grep("mm_.*ko", colnames(expr_data_norm_with_replicates), value = T)
+                                 )])
+LEVELS <- unique(gsub("_[Rr]ep.*|_cebpa", "", df.melt$variable))
+df.melt$variable <- gsub("_[Rr]ep.*|_cebpa", "", df.melt$variable)
+df.melt$value <- df.melt$value
+df.melt$variable <- factor(df.melt$variable, levels=LEVELS, ordered = T)
+ggarrange(ggline(df.melt[which(df.melt$GeneID=="Cebpa" | df.melt$GeneID=="Cebpe"),], x="variable", y="value", add = c("mean_se", "jitter"), color="GeneID",
+                 palette=c("#2a7ab9", "#d52221"), point.color="gray"),
+          ggline(df.melt[which(df.melt$GeneID=="Myc"),], x="variable", y="value", add = c("mean_se", "jitter"), color="GeneID", 
+                 palette=c("#c77cff"), point.color="gray"),
+          ggline(df.melt[which(df.melt$GeneID=="E2f1"),], x="variable", y="value", add = c("mean_se", "jitter"), color="GeneID", 
+                 palette=c("#3caa3c"), point.color="gray"), nrow=2, ncol=2)
+
+df.melt <- melt(expr_data[grep("^Myc$|^Mxd1$|^Max$", expr_data$GeneID),
+                                               c("GeneID",
+                                                 grep("gmpG.*wt", colnames(expr_data), value = T),
+                                                 grep("epm_.*wt", colnames(expr_data), value = T),
+                                                 grep("lpm_.*wt", colnames(expr_data), value = T),
+                                                 grep("mm_.*wt", colnames(expr_data), value = T),
+                                                 grep("gmpG_.*ko", colnames(expr_data), value = T),
+                                                 grep("epm_.*ko", colnames(expr_data), value = T),
+                                                 grep("lpm_.*ko", colnames(expr_data), value = T),
+                                                 grep("mm_.*ko", colnames(expr_data), value = T)
+                                               )])
+
+df.melt$class <- gsub("_.*", "", (df.melt$variable))
+df.melt$variable <- gsub("^.*_", "", gsub("_[Rr]ep.*", "", df.melt$variable))
+df.melt$class <- factor(df.melt$class, levels=c("gmpG", "epm", "lpm", "mm"))
+ggline(df.melt[which(df.melt$GeneID=="Myc"),], x="class", y="value", add = c("mean_se", "jitter"), color="variable", palette=c("#2a7ab9", "#d52221"))
+# table(df.melt[which(df.melt$GeneID=="Myc"),c("variable", "class")])
+
+df.melt <- melt(expr_data_norm_with_replicates[grep("^Myc$|^Mxd1$|^Max$|^Nfyb$|^Lin54$", expr_data_norm_with_replicates$GeneID),
+                               c("GeneID",
+                                 grep("lsk_.*wt", colnames(expr_data_norm_with_replicates), value = T),
+                                 grep("pregm_.*wt", colnames(expr_data_norm_with_replicates), value = T),
+                                 grep("gmp_.*wt|gmpG.*wt", colnames(expr_data_norm_with_replicates), value = T),
+                                 grep("gmpG.*wt", colnames(expr_data_norm_with_replicates), value = T),
+                                 grep("epm_.*wt", colnames(expr_data_norm_with_replicates), value = T),
+                                 grep("lpm_.*wt", colnames(expr_data_norm_with_replicates), value = T),
+                                 grep("my_.*wt", colnames(expr_data_norm_with_replicates), value = T),
+                                 grep("mm_.*wt", colnames(expr_data_norm_with_replicates), value = T),
+                                 grep("bc_.*wt", colnames(expr_data_norm_with_replicates), value = T),
+                                 grep("pmn_.*wt", colnames(expr_data_norm_with_replicates), value = T)
+                                 )])
+LEVELS <- unique(gsub("_[Rr]ep.*|_cebpa", "", df.melt$variable))
+df.melt$variable <- gsub("_[Rr]ep.*|_cebpa", "", df.melt$variable)
+df.melt$value <- df.melt$value
+df.melt$variable <- factor(df.melt$variable, levels=LEVELS, ordered = T)
+ggarrange(ggline(df.melt[which(df.melt$GeneID=="Myc"),], x="variable", y="value", add = c("mean_se", "jitter"), color="GeneID"),
+          ggline(df.melt[which(df.melt$GeneID=="Mxd1"),], x="variable", y="value", add = c("mean_se", "jitter"), color="GeneID"),
+          ggline(df.melt[which(df.melt$GeneID=="Max"),], x="variable", y="value", add = c("mean_se", "jitter"), color="GeneID"),
+          ggline(df.melt[which(df.melt$GeneID=="Nfyb" | df.melt$GeneID=="Lin54"),], x="variable", y="value", add = c("mean_se", "jitter"), color="GeneID",
+                 palette=c("#00b9e3", "#db72fb"), point.color="gray"), nrow=2, ncol=2)
+
 dev.off()
 ```
 
@@ -1492,27 +1572,44 @@ table(test$myc_class)
 test$myc_class <- factor(test$myc_class, levels=c("neutral", "de", "cell_cycle"), ordered=T)
 test <- test[order(-test$myc_chip),]
 
-p1 <- ggboxplot(test[,c("myc_target", "log2FC_mm")], x="myc_target", y="log2FC_mm", notch=T, notchwdth=0.6, outlier.shape = NA, yscale="none", fill="myc_target") +
-  xlab("") + ylab("Gene expr. FC (mm)") +
-  scale_fill_manual(values=c("#8da0cb", "#66c2a5", "#fc8d62")) +
-  stat_compare_means(comparisons = list(c("myc_target", "not_myc_target")), method.args = list(alternative = "g")) +
-  theme(legend.position = "top")
+# p1 <- ggboxplot(test[,c("myc_target", "log2FC_mm")], x="myc_target", y="log2FC_mm", notch=T, notchwdth=0.6, outlier.shape = NA, yscale="none", fill="myc_target") +
+#   xlab("") + ylab("Gene expr. FC (mm)") +
+#   scale_fill_manual(values=c("#8da0cb", "#66c2a5", "#fc8d62")) +
+#   stat_compare_means(comparisons = list(c("myc_target", "not_myc_target")), method.args = list(alternative = "g")) +
+#   theme(legend.position = "top")
 
-p2 <- ggboxplot(test[,c("myc_class", "log2FC_mm")], x="myc_class", y="log2FC_mm", notch=T, notchwdth=0.6, outlier.shape = NA, yscale="none", fill="myc_class") +
+p1 <- ggboxplot(test[,c("myc_class", "log2FC_mm")], x="myc_class", y="log2FC_mm", notch=T, notchwdth=0.6, outlier.shape = NA, yscale="none", fill="myc_class") +
   xlab("") + ylab("Gene expr. FC (mm)") +
   scale_fill_manual(values=c("#8da0cb", "#66c2a5", "#fc8d62")) +
   stat_compare_means(comparisons = list(c("cell_cycle", "de"), c("de", "neutral"), c("cell_cycle", "neutral")), 
                      method.args = list(alternative = "g")) +
   theme(legend.position = "top")
 
-p3 <- ggboxplot(test[,c("myc_class", "myc_chip")], x="myc_class", y="myc_chip", notch=T, notchwdth=0.6, outlier.shape = NA, yscale="log2", fill="myc_class") +
-  xlab("") + ylab("Myc Signal") +
+p2 <- ggboxplot(test[,c("myc_class", "myc_chip")], x="myc_class", y="myc_chip", notch=T, notchwdth=0.6, outlier.shape = NA, yscale="log2", fill="myc_class") +
+  xlab("") + ylab("MYC Signal") +
   scale_fill_manual(values=c("#8da0cb", "#66c2a5", "#fc8d62")) +
   stat_compare_means(comparisons = list(c("cell_cycle", "de"), c("de", "neutral"), c("cell_cycle", "neutral")), 
                      method.args = list(alternative = "g")) +
   theme(legend.position = "top")
 
-ggarrange(p1, p2, p3, nrow=1, ncol=3)
+p3 <- ggboxplot(test[,c("myc_class", "e2f_chip")], x="myc_class", y="e2f_chip", notch=T, notchwdth=0.6, outlier.shape = NA, yscale="log2", fill="myc_class") +
+  xlab("") + ylab("E2F Signal") +
+  scale_fill_manual(values=c("#8da0cb", "#66c2a5", "#fc8d62")) +
+  stat_compare_means(comparisons = list(c("cell_cycle", "de"), c("de", "neutral"), c("cell_cycle", "neutral")), 
+                     method.args = list(alternative = "g")) +
+  theme(legend.position = "top")
+
+p4 <- ggboxplot(test[,c("myc_class", "cebpe_lpmmy")], x="myc_class", y="cebpe_lpmmy", notch=T, notchwdth=0.6, outlier.shape = NA, yscale="log2", fill="myc_class") +
+  xlab("") + ylab("CEBPE Signal") +
+  scale_fill_manual(values=c("#8da0cb", "#66c2a5", "#fc8d62")) +
+  stat_compare_means(comparisons = list(c("cell_cycle", "de"), c("de", "neutral"), c("cell_cycle", "neutral")), 
+                     method.args = list(alternative = "g")) +
+  theme(legend.position = "top")
+
+# t <- test[which(test$myc_class=="cell_cycle"),]
+# t[order(-t$cebpe_lpmmy),]$gene
+
+ggarrange(p1, p2, p3, p4, nrow=2, ncol=2)
 
 mat <- merge(res_mm, test[which(test$myc_class=="cell_cycle" | (test$funcClass=="Apoptosis_TP53" & test$myc_bound=="Y")),c("gene", "myc", "myc_chip", "myc_bound", "funcClass", "cell_cycle", "log2FC_lpm", "log2FC_mm", "myc_target", "e2f_chip", "cebpe_lpmmy")], by.x="gene", by.y="gene")
 colVals <- rep("#8da0cb", nrow(mat))
@@ -1948,7 +2045,7 @@ dev.off()
 #---------------------------------------------------------------------#
 # Compare Cebpa and Cebpe expression profile during myelopoiesis
 
-cebp_granulopoiesis <- melt(expr_data_norm_with_replicates[grep("^Cebpa$|^Cebpe$|^E2f1$|^Cebpb$|^Myc$|^Mxd1$|^Max$",
+cebp_granulopoiesis <- melt(expr_data_norm_with_replicates[grep("^Cebpa$|^Cebpe$|^E2f1$|^Cebpb$|^Myc$|^Mxd1$|^Max$|^Cd81$|^Vcam1$|^Jag1$",
                                                                 expr_data_norm_with_replicates$GeneID),
                                c("GeneID",
                                  grep("lsk_.*wt", colnames(expr_data_norm_with_replicates), value = T),
@@ -1968,7 +2065,7 @@ cebp_granulopoiesis <- summarySE(cebp_granulopoiesis, measurevar = "value", grou
 cebp_granulopoiesis$variable <- factor(cebp_granulopoiesis$variable, levels=LEVELS, ordered = T)
 cebp_granulopoiesis$lineage <- "granulopoiesis"
 
-cebp_monopoiesis <- melt(expr_data_norm_with_replicates[grep("^Cebpa$|^Cebpe$|^E2f1$|^Cebpb$|^Myc$|^Mxd1$|^Max$", 
+cebp_monopoiesis <- melt(expr_data_norm_with_replicates[grep("^Cebpa$|^Cebpe$|^E2f1$|^Cebpb$|^Myc$|^Mxd1$|^Max$|^Cd81$|^Vcam1$|^Jag1$", 
                                                              expr_data_norm_with_replicates$GeneID),
                                c("GeneID",
                                  grep("lsk_.*wt", colnames(expr_data_norm_with_replicates), value = T),
@@ -2071,6 +2168,48 @@ p10 <- ggplot(cebp_monopoiesis[grep("Max", cebp_monopoiesis$GeneID),], aes(varia
   geom_line(aes(group=1, color=lineage), alpha=1) +
   theme_classic() + theme(legend.position="top", axis.text.x = element_text(angle = 45, hjust = 1)) + ylab("Expr.") +
   facet_wrap(~lineage) +  ylim(c(1000,16000))
+ggplot(cebp_granulopoiesis[grep("Cd81", cebp_granulopoiesis$GeneID),], aes(variable, value)) +
+  geom_errorbar(aes(ymin=value-se, ymax=value+se), width=.1, alpha=1) +
+  geom_point(shape = 21, size = 2, aes(fill=lineage)) +
+  #scale_fill_manual(values = c(rep("#000000",12))) +
+  geom_line(aes(group=1, color=lineage), alpha=1) +
+  theme_classic() + theme(legend.position="top", axis.text.x = element_text(angle = 45, hjust = 1)) + ylab("Expr.") +
+  facet_wrap(~lineage) + ylim(c(-200,5000))
+ggplot(cebp_monopoiesis[grep("Cd81", cebp_monopoiesis$GeneID),], aes(variable, value)) +
+  geom_errorbar(aes(ymin=value-se, ymax=value+se), width=.1, alpha=1) +
+  geom_point(shape = 21, size = 2, aes(fill=lineage)) +
+  #scale_fill_manual(values = c(rep("#000000",12))) +
+  geom_line(aes(group=1, color=lineage), alpha=1) +
+  theme_classic() + theme(legend.position="top", axis.text.x = element_text(angle = 45, hjust = 1)) + ylab("Expr.") +
+  facet_wrap(~lineage) + ylim(c(-200,5000))
+ggplot(cebp_granulopoiesis[grep("Vcam1", cebp_granulopoiesis$GeneID),], aes(variable, value)) +
+  geom_errorbar(aes(ymin=value-se, ymax=value+se), width=.1, alpha=1) +
+  geom_point(shape = 21, size = 2, aes(fill=lineage)) +
+  #scale_fill_manual(values = c(rep("#000000",12))) +
+  geom_line(aes(group=1, color=lineage), alpha=1) +
+  theme_classic() + theme(legend.position="top", axis.text.x = element_text(angle = 45, hjust = 1)) + ylab("Expr.") +
+  facet_wrap(~lineage) + ylim(c(-200,3000))
+ggplot(cebp_monopoiesis[grep("Vcam1", cebp_monopoiesis$GeneID),], aes(variable, value)) +
+  geom_errorbar(aes(ymin=value-se, ymax=value+se), width=.1, alpha=1) +
+  geom_point(shape = 21, size = 2, aes(fill=lineage)) +
+  #scale_fill_manual(values = c(rep("#000000",12))) +
+  geom_line(aes(group=1, color=lineage), alpha=1) +
+  theme_classic() + theme(legend.position="top", axis.text.x = element_text(angle = 45, hjust = 1)) + ylab("Expr.") +
+  facet_wrap(~lineage) + ylim(c(-200,3000))
+ggplot(cebp_granulopoiesis[grep("Jag1", cebp_granulopoiesis$GeneID),], aes(variable, value)) +
+  geom_errorbar(aes(ymin=value-se, ymax=value+se), width=.1, alpha=1) +
+  geom_point(shape = 21, size = 2, aes(fill=lineage)) +
+  #scale_fill_manual(values = c(rep("#000000",12))) +
+  geom_line(aes(group=1, color=lineage), alpha=1) +
+  theme_classic() + theme(legend.position="top", axis.text.x = element_text(angle = 45, hjust = 1)) + ylab("Expr.") +
+  facet_wrap(~lineage) + ylim(c(-200,1000))
+ggplot(cebp_monopoiesis[grep("Jag1", cebp_monopoiesis$GeneID),], aes(variable, value)) +
+  geom_errorbar(aes(ymin=value-se, ymax=value+se), width=.1, alpha=1) +
+  geom_point(shape = 21, size = 2, aes(fill=lineage)) +
+  #scale_fill_manual(values = c(rep("#000000",12))) +
+  geom_line(aes(group=1, color=lineage), alpha=1) +
+  theme_classic() + theme(legend.position="top", axis.text.x = element_text(angle = 45, hjust = 1)) + ylab("Expr.") +
+  facet_wrap(~lineage) + ylim(c(-200,1000))
 
 gXExprProfileCebpAE <- ggarrange(p1, p3, p5, p7, p9, p2, p4, p6, p8, p10, nrow=2, ncol=5)
 
@@ -2335,9 +2474,20 @@ colnames(df) <- c("chr", "start", "end", "gene", "score", "strand", "cebp_classP
                   "cebpa_gmp_rep1", "cebpa_gmp_rep2", "cebpe_lpmmy_rep1", "cebpe_lpmmy_rep2", "cebpa_p30_rep1", "cebpa_p30_rep2", "p30_bound")
 df$cebp_classPeaksLocation <- "promoter"
 df[which(df$dist_to_tss>=1000),]$cebp_classPeaksLocation <- "enhancer"
-df$cebp_classPeaksBroad <- sprintf("%s_%s", gsub(",cebpa", "", df$cebp_classPeaks), df$cebp_classPeaksLocation)
+df$cebp_classPeaks <- gsub(",cebpa", "", df$cebp_classPeaks)
+df[which(df$cebp_classPeaks=="cebpe"),]$cebp_classPeaks <- "cebpe_cebpa"
+df[which(df$cebp_classPeaks=="cebpe_cebpa" & df$cebp_classPeaksLocation=="enhancer" & 
+           df$cebpa_gmp_rep1<1 & df$cebpa_gmp_rep2<1),]$cebp_classPeaks <- "cebpe"
+table(df$cebp_classPeaks)
+df$cebp_classPeaksBroad <- sprintf("%s_%s", df$cebp_classPeaks, df$cebp_classPeaksLocation)
+table(df$cebp_classPeaksBroad)
 df$id <- sprintf("REGION%d", seq(1, nrow(df), by=1))
 df$p30_bound <- ifelse(df$p30_bound>0, "Y", "N")
+
+# hist(log(df[which(df$cebp_classPeaksLocation=="enhancer"),]$dist_to_tss), xlab="distance to tss (log)", main="distribution of distance between enhancer and target promoter defined using closest-gene approach")
+# nrow(df[which(df$cebp_classPeaksLocation=="enhancer" & log(df$dist_to_tss)<12),])/nrow(df[which(df$cebp_classPeaksLocation=="enhancer"),])
+
+write.table(df[,c(2:4,1,6,7,5,9,10,19,20)], "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/xls/data_cebpAE.xls", sep="\t", quote = F, row.names = F, col.names = T)
 
 motifAna <- read.table("/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/multiClassMotifAna/cebpa_cebpe/refined/motifAna/REGIONS_INTEREST.find.unique", header=T, sep="\t")
 df <- merge(df, motifAna[grep("CEBPE/jaspar", motifAna$Motif.Name),c("PositionID", "MotifScore")], by.x="id", by.y="PositionID", all=T)
@@ -2345,7 +2495,7 @@ colnames(df)[ncol(df)] <- "motifScore_CEBPE"
 df[is.na(df$motifScore_CEBPE),]$motifScore_CEBPE <- 0
 
 df <- merge(df[,c("gene", "cebp_classPeaks", "cebp_classPeaksLocation", "cebp_classPeaksBroad", "dist_to_tss", "dist_to_e2f1", "cebpa_gmp_rep1", "cebpa_gmp_rep2", "cebpe_lpmmy_rep1", "cebpe_lpmmy_rep2", "cebpa_p30_rep1", "cebpa_p30_rep2", "p30_bound", "motifScore_CEBPE")], genes_cebpe, by.x="gene", by.y="gene", all.x=T)
-df$cebp_classPeaks <- factor(df$cebp_classPeaks, levels=c("cebpa", "cebpe,cebpa", "cebpe"), ordered = T)
+df$cebp_classPeaks <- factor(df$cebp_classPeaks, levels=c("cebpa", "cebpe_cebpa", "cebpe"), ordered = T)
 df$dist_to_e2f1 <- df$dist_to_e2f1+1
 df$dist_to_tss <- df$dist_to_tss+1
 table(df$cebp_classPeaks)
@@ -2354,10 +2504,10 @@ table(df$cebp_classPeaksBroad)
 table(df$p30_bound)
 
 p1 <- ggboxplot(df, x="cebp_classPeaks", y="dist_to_e2f1", notch=T, notchwdth=0.6, yscale="log2") + 
-  stat_compare_means(comparisons = list(c("cebpe", "cebpe,cebpa"), c("cebpe", "cebpa")), method.args = list(alternative = "l"))
+  stat_compare_means(comparisons = list(c("cebpe", "cebpe_cebpa"), c("cebpe", "cebpa")), method.args = list(alternative = "l"))
 
 p2 <- ggboxplot(df, x="cebp_classPeaks", y="dist_to_tss", notch=T, notchwdth=0.6, yscale="log2") + 
-  stat_compare_means(comparisons = list(c("cebpe", "cebpe,cebpa"), c("cebpe", "cebpa")), method.args = list(alternative = "l"))
+  stat_compare_means(comparisons = list(c("cebpe", "cebpe_cebpa"), c("cebpe", "cebpa")), method.args = list(alternative = "l"))
 
 p3 <- freqPlot(melt(table(genes_cebpe[which(genes_cebpe$cluster_de!="F_rest"),c("cluster_de", "cebp_closestPeakClass")])), "density") + theme_bw() + ggtitle("") +
   scale_fill_manual(values=c("#fbb4ae", "#decbe4", "#b3cde3", "#ccebc5")) +
@@ -2366,7 +2516,7 @@ p3 <- freqPlot(melt(table(genes_cebpe[which(genes_cebpe$cluster_de!="F_rest"),c(
 p4 <- ggplot(melt(genes_cebpe[,c("cebpa_gmp", "cebpe_lpmmy", "cebp_class")]), aes(cebp_class, log(value))) + geom_boxplot() + facet_grid(.~variable) + theme_bw()
 
 p5 <- freqPlot(melt(table(df[,c("cluster_de", "cebp_classPeaksBroad")])), "desnity", title="") + theme_bw() +
-  scale_fill_manual(values=c("#fbb4ae", "#decbe4", "#b3cde3", "#ccebc5"))
+  scale_fill_manual(values=c("#fbb4ae", "#decbe4", "#b3cde3", "#ccebc5", "#ffffb3"))
 
 df.melt <- melt(df[,c("cebp_classPeaksLocation", "cebpa_gmp_rep1", "cebpa_gmp_rep2", "cebpe_lpmmy_rep1", "cebpe_lpmmy_rep2"),])
 p6 <- ggboxplot(df.melt, x="cebp_classPeaksLocation", y="value", notch=T, notchwdth=0.6, yscale="log2") +
@@ -2401,22 +2551,46 @@ gXCebpAEPeaks
 test <- (df[which(df$cluster_de!="F_rest"),c("gene", "cebp_classPeaksBroad", "cluster_de")])
 gXCebpAEPeaksGeneClass <- ggarrange(piePlot(melt(table(test[which(test$cebp_classPeaksBroad=="cebpa_enhancer"),c("cebp_classPeaksBroad", "cluster_de")])), title = "") + scale_fill_manual(values=c("#a6611a", "#dfc27d", "#7570b3", "#80cdc1", "#018571")),
           piePlot(melt(table(test[which(test$cebp_classPeaksBroad=="cebpa_promoter"),c("cebp_classPeaksBroad", "cluster_de")])), title = "") + scale_fill_manual(values=c("#a6611a", "#dfc27d", "#7570b3", "#80cdc1", "#018571")),
-          piePlot(melt(table(test[which(test$cebp_classPeaksBroad=="cebpe_promoter"),c("cebp_classPeaksBroad", "cluster_de")])), title = "") + scale_fill_manual(values=c("#a6611a", "#dfc27d", "#7570b3", "#80cdc1", "#018571")),
-          piePlot(melt(table(test[which(test$cebp_classPeaksBroad=="cebpe_enhancer"),c("cebp_classPeaksBroad", "cluster_de")])), title = "") + scale_fill_manual(values=c("#a6611a", "#dfc27d", "#7570b3", "#80cdc1", "#018571")), nrow=2, ncol=2)
+          piePlot(melt(table(test[which(test$cebp_classPeaksBroad=="cebpe_cebpa_enhancer"),c("cebp_classPeaksBroad", "cluster_de")])), title = "") + scale_fill_manual(values=c("#a6611a", "#dfc27d", "#7570b3", "#80cdc1", "#018571")),
+          piePlot(melt(table(test[which(test$cebp_classPeaksBroad=="cebpe_cebpa_promoter"),c("cebp_classPeaksBroad", "cluster_de")])), title = "") + scale_fill_manual(values=c("#a6611a", "#dfc27d", "#7570b3", "#80cdc1", "#018571")), 
+          piePlot(melt(table(test[which(test$cebp_classPeaksBroad=="cebpe_enhancer"),c("cebp_classPeaksBroad", "cluster_de")])), title = "") + scale_fill_manual(values=c("#a6611a", "#dfc27d", "#7570b3", "#80cdc1", "#018571")), nrow=3, ncol=2)
 
 gXCebpAEPeaksGeneClass
+
+# test <- (df[,c("gene", "cebp_classPeaksBroad", "cluster_deRefined")])
+# test$cluster_deRefined <- gsub("-de", "", gsub("-neutral", "", test$cluster_deRefined))
+# ggarrange(piePlot(melt(table(test[which(test$cebp_classPeaksBroad=="cebpa_enhancer" & test$cluster_deRefined!="F_rest"),c("cebp_classPeaksBroad", "cluster_deRefined")])), title = "") + scale_fill_manual(values=c("#a6611a", "#dfc27d", "#7570b3", "#80cdc1", "#018571")),
+#           piePlot(melt(table(test[which(test$cebp_classPeaksBroad=="cebpa_promoter" & test$cluster_deRefined!="F_rest"),c("cebp_classPeaksBroad", "cluster_deRefined")])), title = "") + scale_fill_manual(values=c("#a6611a", "#dfc27d", "#7570b3", "#80cdc1", "#018571")),
+#           piePlot(melt(table(test[which(test$cebp_classPeaksBroad=="cebpe_cebpa_enhancer" & test$cluster_deRefined!="F_rest"),c("cebp_classPeaksBroad", "cluster_deRefined")])), title = "") + scale_fill_manual(values=c("#a6611a", "#dfc27d", "#7570b3", "#80cdc1", "#018571")),
+#           piePlot(melt(table(test[which(test$cebp_classPeaksBroad=="cebpe_cebpa_promoter" & test$cluster_deRefined!="F_rest"),c("cebp_classPeaksBroad", "cluster_deRefined")])), title = "") + scale_fill_manual(values=c("#a6611a", "#dfc27d", "#7570b3", "#80cdc1", "#018571")), 
+#           piePlot(melt(table(test[which(test$cebp_classPeaksBroad=="cebpe_enhancer" & test$cluster_deRefined!="F_rest"),c("cebp_classPeaksBroad", "cluster_deRefined")])), title = "") + scale_fill_manual(values=c("#a6611a", "#dfc27d", "#7570b3", "#80cdc1", "#018571")), nrow=3, ncol=2)
+
+gXCebpAEPeaksGeneClass1 <- ggarrange(piePlot(melt(table(test[which(test$cluster_de=="E_mono" & grepl("enhancer", test$cebp_classPeaksBroad)),
+                                                             c("cluster_de", "cebp_classPeaksBroad")]))) +
+                                       scale_fill_manual(values=c("#b3de69", "#bc80bd", "#fb8072")),
+          piePlot(melt(table(test[which(test$cluster_de=="C_gran" & grepl("enhancer", test$cebp_classPeaksBroad)),
+                                  c("cluster_de", "cebp_classPeaksBroad")]))) +
+            scale_fill_manual(values=c("#b3de69", "#bc80bd", "#fb8072")), nrow=1, ncol=2)
+
+gXCebpAEPeaksGeneClass1
 
 #-----------------------------------------------------------------------#
 ## analysis to compare cebpa and cebpe binding at four classes defined based on their binding dynamics during hematopoiesis
 
-df$cebp_classPeaksBroad <- factor(df$cebp_classPeaksBroad, levels=c("cebpa_enhancer", "cebpa_promoter", "cebpe_enhancer", "cebpe_promoter"),
+df$cebp_classPeaksBroad <- factor(df$cebp_classPeaksBroad, levels=c("cebpa_enhancer", "cebpa_promoter", 
+                                                                    "cebpe_cebpa_enhancer", "cebpe_cebpa_promoter",
+                                                                    "cebpe_enhancer"),
                                   ordered = T)
 table(df$cebp_classPeaksBroad)
 p1 <- ggboxplot(df, x="cebp_classPeaksBroad", y="cebpa_gmp_rep1", notch=T, notchwdth=0.6, yscale="log2") +
-  stat_compare_means(comparisons = list(c("cebpa_enhancer", "cebpe_enhancer"), c("cebpa_promoter", "cebpe_promoter")), method.args = list(alternative = "g"))
+  stat_compare_means(comparisons = list(c("cebpa_enhancer", "cebpe_cebpa_enhancer"), 
+                                        c("cebpa_promoter", "cebpe_cebpa_promoter"),
+                                        c("cebpa_enhancer", "cebpe_enhancer")), method.args = list(alternative = "g"))
 
 p2 <- ggboxplot(df, x="cebp_classPeaksBroad", y="cebpe_lpmmy_rep1", notch=T, notchwdth=0.6, yscale="log2") +
-  stat_compare_means(comparisons = list(c("cebpa_enhancer", "cebpe_enhancer"), c("cebpa_promoter", "cebpe_promoter")), method.args = list(alternative = "l"))
+  stat_compare_means(comparisons = list(c("cebpa_enhancer", "cebpe_cebpa_enhancer"), 
+                                        c("cebpa_promoter", "cebpe_cebpa_promoter"),
+                                        c("cebpa_enhancer", "cebpe_enhancer")), method.args = list(alternative = "l"))
 
 gXCebpAEPeaksSignal <- ggarrange(p1, p2, ncol=2, nrow=1)
 
@@ -2511,6 +2685,7 @@ pdf("/home/pundhir/project/chip-seq-analysis/analysis_cebpe/pdf/analysis_cebpAE.
 gXCebpeEnhancer
 gXCebpAEPeaks
 gXCebpAEPeaksGeneClass
+gXCebpAEPeaksGeneClass1
 gXCebpAEPeaksSignal
 gXCebpAEPeakMotifs
 gXCebpAEPeaksPromoter
@@ -2525,7 +2700,7 @@ dev.off()
 #### gviz tracks for regions around CEBPA and CEBPE genes
 ```{r}
 pdf("/home/pundhir/project/chip-seq-analysis/analysis_cebpe/pdf/gviz.pdf")
-browser_files <- read.table(pipe("grep -v '#\\|gmpG' /home/pundhir/project/chip-seq-analysis/analysis_cebpe/FILES_FOR_GENOME_BROWSER"))
+browser_files <- read.table(pipe("grep -v '#\\|gmpG' /home/pundhir/project/chip-seq-analysis/analysis_cebpe/FILES_FOR_GENOME_BROWSER | grep -v 'cebpa_my12' | grep -v 'cebpa_mm'"))
 colnames(browser_files) <- c("id", "bam_files")
 
 # CEBPE (+6 kb enhancer)
@@ -2559,7 +2734,7 @@ cebpa_h3k27ac <- plot_gviz_track(GEN = "mm9", COOR = "chr7:35891494-35950004",
 ## Myc (chr15:61811875-61826937 or chr15:61815896-61822916)
 myc <- plot_gviz_track(GEN = "mm9", COOR = "chr15:61811875-61826937",
                        BAMFILE = browser_files[grep("cebp.*Rep2|control|myc_esc|e2f1_esc_Rep1", browser_files$id),]$bam_files,
-                       type = "a", maxlimit = 150,
+                       type = "a", maxlimit = "150,150,150,150,150,150,150,150,150,150",
                        BEDFILE=c("/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/E2f1_mm9_lifted.bed",
                                  "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/cMyc_mm9_lifted.bed",
                                  "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/nfyb_esc_ucsc.bed"),
@@ -2651,8 +2826,8 @@ nfyb <- plot_gviz_track(GEN = "mm9", COOR = "chr10:82222905-82227799",
                                  "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/multiClassMotifAna/e2f_peaks/motifAna/REGIONS_INTEREST.annoBed.LIN54")
                        )
 
-## Mmb9
-mmb9 <- plot_gviz_track(GEN = "mm9", COOR = "chr2:164761367-164783160",
+## Mmp9
+mmp9 <- plot_gviz_track(GEN = "mm9", COOR = "chr2:164761367-164783160",
                        BAMFILE = browser_files[grep("cebp.*Rep1", browser_files$id),]$bam_files,
                        type = "a", maxlimit = 400,
                        BEDFILE=c("/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/E2f1_mm9_lifted.bed",
@@ -2941,6 +3116,274 @@ ccnf <- plot_gviz_track(GEN = "mm9", COOR = "chr17:24350936-24398940",
                                  "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/multiClassMotifAna/e2f_peaks/motifAna/REGIONS_INTEREST.annoBed.LIN54")
                        )
 dev.off()
+
+pdf("/home/pundhir/project/chip-seq-analysis/analysis_cebpe/pdf/gviz_cell_cycle_inhibitors.pdf")
+## Cdkn2d (chr9:123836173-123840294; second copy, however GTF file we used for expression quantification has only one copy) (down) (cluster 10)
+cdkn2d <- plot_gviz_track(GEN = "mm9", COOR = "chr9:21092422-21093964",
+                       BAMFILE = browser_files[grep("cebp.*Rep1", browser_files$id),]$bam_files,
+                       type = "a", maxlimit = 200,
+                       BEDFILE=c("/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/E2f1_mm9_lifted.bed",
+                                 "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/cMyc_mm9_lifted.bed",
+                                 "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/nfyb_esc_ucsc.bed",
+                                 "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/multiClassMotifAna/e2f_peaks/motifAna/REGIONS_INTEREST.annoBed.NFYB",
+                                 "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/multiClassMotifAna/e2f_peaks/motifAna/REGIONS_INTEREST.annoBed.LIN54")
+                       )
+
+## Gadd45a (chr6:66984512-66987979) (down) (cluster 11)
+gadd45a <- plot_gviz_track(GEN = "mm9", COOR = "chr6:66986910-66988421",
+                       BAMFILE = browser_files[grep("cebp.*Rep1", browser_files$id),]$bam_files,
+                       type = "a", maxlimit = 200,
+                       BEDFILE=c("/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/E2f1_mm9_lifted.bed",
+                                 "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/cMyc_mm9_lifted.bed",
+                                 "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/nfyb_esc_ucsc.bed",
+                                 "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/multiClassMotifAna/e2f_peaks/motifAna/REGIONS_INTEREST.annoBed.NFYB",
+                                 "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/multiClassMotifAna/e2f_peaks/motifAna/REGIONS_INTEREST.annoBed.LIN54")
+                       )
+## Cdkn1a (chr17:29226372-29242012) (up) (cluster 15)
+cdkn1a <- plot_gviz_track(GEN = "mm9", COOR = "chr17:29226372-29242012",
+                       BAMFILE = browser_files[grep("cebp.*Rep1", browser_files$id),]$bam_files,
+                       type = "a", maxlimit = 200,
+                       BEDFILE=c("/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/E2f1_mm9_lifted.bed",
+                                 "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/cMyc_mm9_lifted.bed",
+                                 "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/nfyb_esc_ucsc.bed",
+                                 "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/multiClassMotifAna/e2f_peaks/motifAna/REGIONS_INTEREST.annoBed.NFYB",
+                                 "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/multiClassMotifAna/e2f_peaks/motifAna/REGIONS_INTEREST.annoBed.LIN54"
+                                 )
+                       )
+dev.off()
+
+##--------------------------------------------------------------------------##
+## Gviz plots for Cebpe target genes
+##--------------------------------------------------------------------------##
+
+pdf("/home/pundhir/project/chip-seq-analysis/analysis_cebpe/pdf/gviz_cebpe_cripr.pdf")
+
+browser_files <- read.table(pipe("grep -v '#\\|gmpG' /home/pundhir/project/chip-seq-analysis/analysis_cebpe/FILES_FOR_GENOME_BROWSER"))
+colnames(browser_files) <- c("id", "bam_files")
+
+##  Card10
+# card10 <- plot_gviz_track(GEN = "mm9", COOR = "chr15:78605566-78641472",
+#                        BAMFILE = browser_files[grep("cebp.*Rep2|control|h3k27ac", browser_files$id),]$bam_files,
+#                        type = "a", maxlimit = "400,400,400,400,400,400,400,400,40,40,40,40,40,40,40,40",
+#                        BEDFILE=c("/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/ALLPEAKS.BED.SIG.cebpe",
+#                                  "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/revision/card10.bed"),
+#                        cex = 0.5
+#                        )
+
+## hlx
+hlx <- plot_gviz_track(GEN = "mm9", COOR = "chr1:186196483-186602253",
+                       BAMFILE = browser_files[grep("cebp.*Rep2|control|h3k27ac.*Rep1", browser_files$id),]$bam_files,
+                       type = "a", maxlimit = "60,60,60,60,60,60,60,60,20,20,20,20,300,300,300,300,150,150,150,150",
+                       BEDFILE=c("/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/ALLPEAKS.BED.SIG.cebpe",
+                                 "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/revision/hlx.bed"),
+                       cex = 0.5
+                       )
+
+## igf1r
+# igf1r <- plot_gviz_track(GEN = "mm9", COOR = "chr7:75026790-75448906",
+#                        BAMFILE = browser_files[grep("cebp.*Rep2|control|h3k27ac.*Rep1", browser_files$id),]$bam_files,
+#                        type = "a", maxlimit = "100,100,100,100,100,100,100,100,20,20,20,20",
+#                        BEDFILE=c("/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/ALLPEAKS.BED.SIG.cebpe",
+#                                  "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/revision/igf1r.bed"),
+#                        cex = 0.5
+#                        )
+
+## tgfbr2
+# tgfbr2 <- plot_gviz_track(GEN = "mm9", COOR = "chr9:115986024-116090171",
+#                        BAMFILE = browser_files[grep("cebp.*Rep2|control|h3k27ac.*Rep1", browser_files$id),]$bam_files,
+#                        type = "a", maxlimit = "100,100,100,100,100,100,100,100,40,40,40,40",
+#                        BEDFILE=c("/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/ALLPEAKS.BED.SIG.cebpe",
+#                                  "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/revision/tgfbr2.bed"),
+#                        cex = 0.5
+#                        )
+
+## picalm
+# picalm <- plot_gviz_track(GEN = "mm9", COOR = "chr7:97136056-97328847",
+#                        BAMFILE = browser_files[grep("cebp.*Rep2|control|h3k27ac.*Rep1", browser_files$id),]$bam_files,
+#                        type = "a", maxlimit = "60,60,60,60,60,60,60,60,50,50,50,50",
+#                        BEDFILE=c("/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/ALLPEAKS.BED.SIG.cebpe",
+#                                  "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/revision/picalm.bed"),
+#                        cex = 0.5
+#                        )
+
+## nt5e
+# nt5e <- plot_gviz_track(GEN = "mm9", COOR = "chr9:88172447-88266927",
+#                        BAMFILE = browser_files[grep("cebp.*Rep2|control|h3k27ac.*Rep1", browser_files$id),]$bam_files,
+#                        type = "a", maxlimit = "60,60,60,60,60,60,60,60,30,30,30,30",
+#                        BEDFILE=c("/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/ALLPEAKS.BED.SIG.cebpe",
+#                                  "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/revision/nt5e.bed"),
+#                        cex = 0.5
+#                        )
+
+## mmp8
+# mmp8 <- plot_gviz_track(GEN = "mm9", COOR = "chr9:7555915-7571001",
+#                        BAMFILE = browser_files[grep("cebp.*Rep2|control|h3k27ac.*Rep1", browser_files$id),]$bam_files,
+#                        type = "a", maxlimit = "500,500,500,500,500,500,500,500,30,30,30,30",
+#                        BEDFILE=c("/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/ALLPEAKS.BED.SIG.cebpe",
+#                                  "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/revision/mmp8.bed"),
+#                        cex = 0.5
+#                        )
+
+## ltf
+# plot_gviz_track(GEN = "mm9", COOR = "chr9:110915927-110951139",
+#                        BAMFILE = browser_files[grep("cebp.*Rep2|control|h3k27ac.*Rep1", browser_files$id),]$bam_files,
+#                        type = "a", maxlimit = "400,400,400,400,400,400,400,400,30,30,30,30",
+#                        BEDFILE=c("/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/ALLPEAKS.BED.SIG.cebpe",
+#                                  "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/revision/ltf.bed"),
+#                        cex = 0.5
+#                        )
+
+## hp
+plot_gviz_track(GEN = "mm9", COOR = "chr8:112098016-112104083",
+                       BAMFILE = browser_files[grep("cebp.*Rep2|control|h3k27ac.*Rep2", browser_files$id),]$bam_files,
+                       type = "a", maxlimit = "800,800,800,800,800,800,800,800,40,40,40,40,1500,1500,1500,1500,500,500,500,500",
+                       BEDFILE=c("/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/ALLPEAKS.BED.SIG.cebpe",
+                                 "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/revision/hp.bed"),
+                       cex = 0.5
+                       )
+
+## ngp (chr9:110321510-110326317)
+# plot_gviz_track(GEN = "mm9", COOR = "chr9:110321510-110326317",
+#                        BAMFILE = browser_files[grep("cebp.*Rep2|control|h3k27ac.*Rep1", browser_files$id),]$bam_files,
+#                        type = "a", maxlimit = "800,800,800,800,800,800,800,800,50,50,50,50",
+#                        BEDFILE=c("/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/ALLPEAKS.BED.SIG.cebpe",
+#                                  "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/revision/ngp.bed"),
+#                        cex = 0.5
+#                        )
+
+## dhrs7 (chr12:73683417-73823033, chr12:73742293-73774863)
+plot_gviz_track(GEN = "mm9", COOR = "chr12:73742293-73774863",
+                       BAMFILE = browser_files[grep("cebp.*Rep2|control|h3k27ac.*Rep1", browser_files$id),]$bam_files,
+                       type = "a", maxlimit = "800,800,800,800,800,800,800,800,100,100,100,100,2000,2000,2000,2000,500,500,500,500",
+                       BEDFILE=c("/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/ALLPEAKS.BED.SIG.cebpe",
+                                 "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/revision/dhrs7.bed",
+                                 "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/revision/dhrs7_promoter.bed"),
+                       cex = 0.5
+                       )
+# ## Ifitm6 (chr7:148197387-148207115)
+# plot_gviz_track(GEN = "mm9", COOR = "chr7:148197387-148207115",
+#                        BAMFILE = browser_files[grep("cebp.*Rep2|control|h3k27ac.*Rep1", browser_files$id),]$bam_files,
+#                        type = "a", maxlimit = "800,800,800,800,800,800,800,800,50,50,50,50",
+#                        BEDFILE=c("/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/ALLPEAKS.BED.SIG.cebpe"),
+#                        cex = 0.5
+#                        )
+
+#^Card10$|^Hlx$|^Tgfbr2$|^Nt5e$|^Mmp8$|^Ltf$|^Hp$|^Ngp$|^Dhrs7$|^Camp$
+df.melt <- melt(expr_data_norm_with_replicates[which(grepl("E2f", expr_data_norm_with_replicates$GeneID)),
+                               c("GeneID",
+                                 grep("lsk_.*wt", colnames(expr_data_norm_with_replicates), value = T),
+                                 grep("pregm_.*wt", colnames(expr_data_norm_with_replicates), value = T),
+                                 grep("gmp_.*wt|gmpG.*wt", colnames(expr_data_norm_with_replicates), value = T),
+                                 grep("gmpG.*wt", colnames(expr_data_norm_with_replicates), value = T),
+                                 grep("epm_.*wt", colnames(expr_data_norm_with_replicates), value = T),
+                                 grep("lpm_.*wt", colnames(expr_data_norm_with_replicates), value = T),
+                                 grep("my_.*wt", colnames(expr_data_norm_with_replicates), value = T),
+                                 grep("mm_.*wt", colnames(expr_data_norm_with_replicates), value = T),
+                                 grep("bc_.*wt", colnames(expr_data_norm_with_replicates), value = T),
+                                 grep("pmn_.*wt", colnames(expr_data_norm_with_replicates), value = T),
+                                 grep("gmpG_.*ko", colnames(expr_data_norm_with_replicates), value = T),
+                                 grep("epm_.*ko", colnames(expr_data_norm_with_replicates), value = T),
+                                 grep("lpm_.*ko", colnames(expr_data_norm_with_replicates), value = T),
+                                 grep("mm_.*ko", colnames(expr_data_norm_with_replicates), value = T)
+                                 )])
+LEVELS <- unique(gsub("_[Rr]ep.*|_cebpa", "", df.melt$variable))
+df.melt$variable <- gsub("_[Rr]ep.*|_cebpa", "", df.melt$variable)
+df.melt$value <- df.melt$value
+df.melt <- summarySE(df.melt, measurevar = "value", groupvars = c("GeneID", "variable"))
+df.melt$variable <- factor(df.melt$variable, levels=LEVELS, ordered = T)
+
+ggplot(df.melt, aes(variable, value)) +
+  geom_errorbar(aes(ymin=value-se, ymax=value+se), width=.1, alpha=1) +
+  geom_point(shape = 21, size = 2, aes(fill=GeneID)) +
+  #scale_fill_manual(values = c(rep("#000000",12))) +
+  geom_line(aes(group=1, color=GeneID), alpha=1) +
+  theme_classic() + theme(legend.position="top", axis.text.x = element_text(angle = 45, hjust = 1)) + ylab("Expr.") +
+  facet_wrap(~GeneID, scales="free")
+dev.off()
+
+
+##--------------------------------------------------------------------------##
+## Gviz plots for genes shown in the paper (now with CEBPA ChIP-seq data)
+##--------------------------------------------------------------------------##
+pdf("/home/pundhir/project/chip-seq-analysis/analysis_cebpe/pdf/gviz_revision.pdf")
+browser_files <- read.table(pipe("grep -v '#\\|gmpG' /home/pundhir/project/chip-seq-analysis/analysis_cebpe/FILES_FOR_GENOME_BROWSER"))
+colnames(browser_files) <- c("id", "bam_files")
+
+cdk4 <- plot_gviz_track(GEN = "mm9", COOR = "chr10:126499725-126505396",
+                       BAMFILE = browser_files[grep("cebp.*Rep1|myc_esc|e2f1_esc_Rep1", browser_files$id),]$bam_files,
+                       type = "a", maxlimit = "150,150,150,150,150,150,150,150,40,150,700,700,700,700",
+                       BEDFILE=c("/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/E2f1_mm9_lifted.bed",
+                                 "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/cMyc_mm9_lifted.bed",
+                                 "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/nfyb_esc_ucsc.bed",
+                                 "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/multiClassMotifAna/e2f_peaks/motifAna/REGIONS_INTEREST.annoBed.NFYB",
+                                 "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/multiClassMotifAna/e2f_peaks/motifAna/REGIONS_INTEREST.annoBed.LIN54")
+                       )
+
+myc <- plot_gviz_track(GEN = "mm9", COOR = "chr15:61811875-61826937",
+                       BAMFILE = browser_files[grep("cebp.*Rep2|control|myc_esc|e2f1_esc_Rep1", browser_files$id),]$bam_files,
+                       type = "a", maxlimit = "150,150,150,150,150,150,150,150,150,150,1500,1500,1500,1500",
+                       BEDFILE=c("/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/E2f1_mm9_lifted.bed",
+                                 "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/cMyc_mm9_lifted.bed",
+                                 "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/nfyb_esc_ucsc.bed"),
+                       cex = 0.5
+                       )
+
+myc1 <- plot_gviz_track(GEN = "mm9", COOR = "chr15:61815896-61822916",
+                       BAMFILE = browser_files[grep("cebp.*Rep2|control|myc_esc|e2f1_esc_Rep1", browser_files$id),]$bam_files,
+                       type = "a", maxlimit = "30,30,30,30,30,30,30,30,100,100,100,100,100,100",
+                       BEDFILE=c("/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/E2f1_mm9_lifted.bed",
+                                 "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/cMyc_mm9_lifted.bed",
+                                 "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/nfyb_esc_ucsc.bed",
+                                 "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/multiClassMotifAna/e2f_peaks/motifAna/REGIONS_INTEREST.annoBed.NFYB",
+                                 "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/multiClassMotifAna/e2f_peaks/motifAna/REGIONS_INTEREST.annoBed.LIN54",
+                                 "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/motifAna_selGenes/motifAna/myc/REGIONS_INTEREST.annoBed"),
+                       cex = 0.5
+                       )
+
+ccnb1 <- plot_gviz_track(GEN = "mm9", COOR = "chr13:101547075-101557803",
+                       BAMFILE = browser_files[grep("cebp.*Rep1|^nfyb|^e2f1_esc_Rep1", browser_files$id),]$bam_files,
+                       type = "a", maxlimit = "20,20,20,20,20,20,20,20,200,30,100,100,100,100",
+                       BEDFILE=c("/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/E2f1_mm9_lifted.bed",
+                                 "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/cMyc_mm9_lifted.bed",
+                                 "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/nfyb_esc_ucsc.bed",
+                                 "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/multiClassMotifAna/e2f_peaks/motifAna/REGIONS_INTEREST.annoBed.NFYB",
+                                 "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/multiClassMotifAna/e2f_peaks/motifAna/REGIONS_INTEREST.annoBed.LIN54",
+                                 "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/multiClassMotifAna/e2f_peaks/motifAna/REGIONS_INTEREST.annoBed.E2F1"
+                                 )
+                       )
+
+cdk1 <- plot_gviz_track(GEN = "mm9", COOR = "chr10:68783105-68831938",
+                       BAMFILE = browser_files[grep("cebp.*Rep1|^nfyb|^e2f1_esc_Rep1", browser_files$id),]$bam_files,
+                       type = "a", maxlimit = "40,40,40,40,40,40,40,40,150,30,400,400,400,400",
+                       BEDFILE=c("/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/E2f1_mm9_lifted.bed",
+                                 "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/cMyc_mm9_lifted.bed",
+                                 "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/nfyb_esc_ucsc.bed",
+                                 "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/multiClassMotifAna/e2f_peaks/motifAna/REGIONS_INTEREST.annoBed.NFYB",
+                                 "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/multiClassMotifAna/e2f_peaks/motifAna/REGIONS_INTEREST.annoBed.LIN54",
+                                 "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/multiClassMotifAna/e2f_peaks/motifAna/REGIONS_INTEREST.annoBed.E2F1"
+                                 )
+                       )
+
+# CEBPE (+6 kb enhancer)
+cebpe <- plot_gviz_track(GEN = "mm9", COOR = "chr14:55323682-55332011",
+                        BAMFILE = browser_files[grep("cebp.*Rep1|myc_esc|max_esc|e2f1_esc_Rep1", browser_files$id),]$bam_files, 
+                        type = "a", maxlimit = "500,500,500,500,500,500,500,500,100,20,20,6000,6000,6000,6000",
+                        BEDFILE=c("/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/E2f1_mm9_lifted.bed",
+                                  "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/cMyc_mm9_lifted.bed",
+                                  "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/multiClassMotifAna/e2f_peaks/motifAna/REGIONS_INTEREST.annoBed.E2F1"),
+                        cex = 0.5)
+
+# CEBPA (+37 kb enhancer)
+cebpa <- plot_gviz_track(GEN = "mm9", COOR = "chr7:35891494-35950004",
+                        BAMFILE = browser_files[grep("cebp.*Rep1|myc_esc|max_esc|e2f1_esc_Rep1", browser_files$id),]$bam_files, 
+                        type = "a", maxlimit = "150,150,150,150,150,150,150,150,20,10,20,1000,1000,1000,1000",
+                        BEDFILE=c("/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/E2f1_mm9_lifted.bed",
+                                  "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/cMyc_mm9_lifted.bed",
+                                  "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/multiClassMotifAna/e2f_peaks/motifAna/REGIONS_INTEREST.annoBed.E2F1",
+                                  "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/multiClassMotifAna/e2f_peaks/motifAna/REGIONS_INTEREST.annoBed.CEBPE",
+                                  "/home/pundhir/project/chip-seq-analysis/analysis_cebpe/analysis/E2f1_mm9_source2.bed.ucsc"),
+                       cex = 0.5)
+dev.off()
 ```
 
 ## cell cycle genes analysis
@@ -3048,7 +3491,114 @@ gXCellCycleGenes
 dev.off()
 ```
 
+## revision analysis
+```{r}
+xie_de_genes <- read.table(pipe("grep -vw GM ~/project/chip-seq-analysis/analysis_cebpe/revision/xie_de_genes.txt"))
+xie_de_genes <- merge(xie_de_genes, genes_cebpe, by.x="V2", by.y="gene")
+# xie_de_genes[which(xie_de_genes$cluster==3 | xie_de_genes$cluster==4 | xie_de_genes$cluster==5),]$cluster_de <- "A"
+# xie_de_genes[which(xie_de_genes$cluster==6),]$cluster_de <- "B"
+# xie_de_genes[which(xie_de_genes$cluster==10 | xie_de_genes$cluster==11),]$cluster_de <- "C"
+# xie_de_genes[which(xie_de_genes$cluster==12),]$cluster_de <- "D"
+# xie_de_genes[which(xie_de_genes$cluster==14 | xie_de_genes$cluster==15),]$cluster_de <- "E"
 
+freqPlot(melt(table(xie_de_genes[,c("V1", "cluster")])), "density") + theme_bw()
+# freqPlot(reshape2::melt(table(xie_de_genes[which(xie_de_genes$cluster_de!="F_rest"),c("V1", "cluster_de")])), "density") + theme_bw()
+freqPlot(reshape2::melt(table(xie_de_genes[which(xie_de_genes$cluster_de!="F_rest" & !grepl("G5", xie_de_genes$V1)),
+                                           c("cluster_de", "V1")])), "density") + theme_bw()
+
+pheatmap(xie_de_genes[order(xie_de_genes$V1),grep("wt_norm", colnames(genes_cebpe), value=T)], scale="row", cluster_rows = F, cluster_cols = F)
+
+##
+df <- read.table("~/project/chip-seq-analysis/analysis_cebpe/analysis/genes_cebpe.bed.cebpaRevision")
+colnames(df) <- c("chr", "start", "end", "name", "score", "strand", "cluster_deRefined", "peak_class", 
+                  "input_my12_wt_Rep2", "input_my12_wt_Rep1", "input_my12_ko_Rep1", "input_mm_wt_Rep1", "input_mm_ko_Rep1",
+                  "h3k27ac_my12_wt_Rep2", "h3k27ac_my12_wt_Rep1", "h3k27ac_my12_ko_Rep2", "h3k27ac_my12_ko_Rep1", 
+                  "h3k27ac_mm_wt_Rep2", "h3k27ac_mm_wt_Rep1", "h3k27ac_mm_ko_Rep2", "h3k27ac_mm_ko_Rep1", 
+                  "cebpa_my12_wt_Rep2", "cebpa_my12_wt_Rep1", "cebpa_my12_ko_Rep2", "cebpa_my12_ko_Rep1", 
+                  "cebpa_mm_wt_Rep2", "cebpa_mm_wt_Rep1", "cebpa_mm_ko_Rep2", "cebpa_mm_ko_Rep1")
+
+
+## cebpe (my12)
+mat <- as.matrix(df[,grep("cebpa_my12", colnames(df))])
+rownames(mat) <- df$name
+colnames(mat)
+mat <- matrix2deseq2(mat, "wt,wt,ko,ko")
+mat$de <- "neutral"
+mat[which(mat$pvalue<0.05 & mat$log2FoldChange<0),]$de <- "down"
+mat[which(mat$pvalue<0.05 & mat$log2FoldChange>0),]$de <- "up"
+table(mat$de)
+colnames(mat) <- sprintf("%s_cebpa_my12", colnames(mat))
+df <- merge(df, mat[,grep("gene|baseMean|log2FoldChange|de", colnames(mat), value=T)], by.x="name", by.y="gene_cebpa_my12")
+
+## cebpe (mm)
+mat <- as.matrix(df[,grep("cebpa_mm", colnames(df))])
+rownames(mat) <- df$name
+colnames(mat)
+mat <- matrix2deseq2(mat, "wt,wt,ko,ko")
+mat$de <- "neutral"
+mat[which(mat$pvalue<0.05 & mat$log2FoldChange<0),]$de <- "down"
+mat[which(mat$pvalue<0.05 & mat$log2FoldChange>0),]$de <- "up"
+table(mat$de)
+colnames(mat) <- sprintf("%s_cebpa_mm", colnames(mat))
+df <- merge(df, mat[,grep("gene|baseMean|log2FoldChange|de", colnames(mat), value=T)], by.x="name", by.y="gene_cebpa_mm")
+
+## h3k27ac (my12)
+mat <- as.matrix(df[,grep("h3k27ac_my12", colnames(df))])
+rownames(mat) <- df$name
+colnames(mat)
+mat <- matrix2deseq2(mat, "wt,wt,ko,ko")
+mat$de <- "neutral"
+mat[which(mat$pvalue<0.05 & mat$log2FoldChange<0),]$de <- "down"
+mat[which(mat$pvalue<0.05 & mat$log2FoldChange>0),]$de <- "up"
+table(mat$de)
+colnames(mat) <- sprintf("%s_h3k27ac_my12", colnames(mat))
+df <- merge(df, mat[,grep("gene|baseMean|log2FoldChange|de", colnames(mat), value=T)], by.x="name", by.y="gene_h3k27ac_my12")
+
+## h3k27ac (mm)
+mat <- as.matrix(df[,grep("h3k27ac_mm", colnames(df))])
+rownames(mat) <- df$name
+colnames(mat)
+mat <- matrix2deseq2(mat, "wt,wt,ko,ko")
+mat$de <- "neutral"
+mat[which(mat$pvalue<0.05 & mat$log2FoldChange<0),]$de <- "down"
+mat[which(mat$pvalue<0.05 & mat$log2FoldChange>0),]$de <- "up"
+table(mat$de)
+colnames(mat) <- sprintf("%s_h3k27ac_mm", colnames(mat))
+df <- merge(df, mat[,grep("gene|baseMean|log2FoldChange|de", colnames(mat), value=T)], by.x="name", by.y="gene_h3k27ac_mm")
+
+df.melt <- melt(df[, c("cluster_deRefined", grep("log2FoldChange", colnames(df), value=T))])
+p1 <- ggplot(df.melt, aes(cluster_deRefined, value)) + 
+  geom_boxplot() + facet_grid(.~variable) + theme_bw() + theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  geom_hline(yintercept = 0, linetype="dashed") + ylab("log2FoldChange in ChIP-seq signal")
+
+df.melt <- df.melt[grepl("de", df.melt$cluster_deRefined),]
+p2 <- ggplot(df.melt, aes(cluster_deRefined, value)) + 
+  geom_boxplot(notch = 0.5) + facet_grid(.~variable) + theme_bw() + theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  geom_hline(yintercept = 0, linetype="dashed") + ylab("log2FoldChange in ChIP-seq signal")
+
+pdf("/home/pundhir/project/chip-seq-analysis/analysis_cebpe/pdf/analysis_cebpa_revision.pdf")
+ggarrange(p1, p2, nrow=2, ncol=1)
+dev.off()
+
+# df.melt <- melt(df[which(df$de_cebpa_my12!="neutral" & df$de_cebpa_mm!="neutral"),
+                   # c("peak_class", grep("log2FoldChange", colnames(df), value=T))])
+# ggplot(df.melt, aes(peak_class, value)) + geom_boxplot(notch=0.5) + theme_bw() + facet_grid(.~variable)
+
+# barplot(table(df[which(grepl("-de", df$cluster_deRefined) & df$peak_class=="e2f1+cebpe+nfyb+lin54" & df$de_cebpa_my12=="neutral" & df$de_cebpa_mm=="neutral" & 
+                 # df$de_h3k27ac_my12!="down" & df$de_h3k27ac_mm!="down"),]$cluster_deRefined)/table(df[which(grepl("-de", df$cluster_deRefined) & df$peak_class=="e2f1+cebpe+nfyb+lin54"),]$cluster_deRefined), las=2)
+
+# df[which(grepl("B_lpm-de", df$cluster_deRefined) & df$peak_class=="e2f1+cebpe+nfyb+lin54" & df$de_cebpa_my12=="neutral" & df$de_cebpa_mm=="neutral" & 
+                 # df$de_h3k27ac_my12!="down" & df$de_h3k27ac_mm!="down"),]$name
+
+# barplot(table(df[which(grepl("-de", df$cluster_deRefined) & df$de_cebpa_my12=="neutral" & df$de_cebpa_mm=="neutral" & 
+                 # df$de_h3k27ac_my12=="down" & df$de_h3k27ac_mm=="down"),]$cluster_deRefined)/table(df$cluster_deRefined), las=2)
+
+# df[which(grepl("-de", df$cluster_deRefined) & df$de_cebpa_my12=="neutral" & df$de_cebpa_mm=="neutral" & 
+                 # df$de_h3k27ac_my12=="down" & df$de_h3k27ac_mm=="down"),]$name
+
+test <- merge(df, genes_cebpe[,c("gene", "log2FC_lpm", "log2FC_mm")], by.x="name", by.y="gene")
+cor(test$log2FC_mm, test$log2FoldChange_h3k27ac_mm, use="complete.obs", method="spearman")
+```
 
 
 
@@ -3495,5 +4045,132 @@ geneSet[[8]]$cluster_de <- "E_UP"
 
 geneSet[[9]] <- genes_cebpe[!genes_cebpe$gene %in% do.call(rbind, geneSet)$gene,]
 geneSet[[9]]$cluster_de <- "F_rest"
+```
+
+## Kim's plots
+```{r}
+pdf("/home/pundhir/project/chip-seq-analysis/analysis_cebpe/pdf/kim_plots_points.pdf")
+df <- as.data.frame(rbind(c(0, 0,	4), 
+                    c(5, 15, 8), 
+                    c(100,	100, 100),
+                    c(NA, 74, 72),
+                    c(42, 68, 61),
+                    c(28, 59, 52),
+                    c(18,	55, 41)))
+colnames(df) <- c("rep1", "rep2", "rep3")
+df$id <- c("MOCK", "neg.control", "pos.control", "10e-p32", "30e-p33", "100e-p32", "250e-p32")
+df$id <- factor(df$id, levels=df$id, ordered = T)
+
+df.melt <- melt(df)
+ggbarplot(df.melt, x="id", y="value", add = c("mean_se", "jitter"), fill=c("gray"), point.color="gray")
+
+df <- as.data.frame(rbind(c(0.2070, 0.1210,	1.2500,	1.2800,	2.6300,	1.3300,	3.1500),
+            c(0.2240,	0.1610,	1.4200,	1.1600,	2.2800,	1.5200,	2.7600),
+            c(0.2230,	0.1620,	1.9500,	1.4500,	3.8100,	1.2600,	4.4100),
+            c(0.3920,	0.3570,	0.7460,	0.0186,	3.7900,	0.0000,	0.0016),
+            c(0.3420,	0.2980,	0.9480,	0.0211,	1.2900,	0.0002,	0.0002),
+            c(0.2360,	0.3230,	0.8410,	0.0183,	1.6500,	0.0000,	0.0001)))
+colnames(df) <- c("GP", "EPM", "LPM", "MY", "MM", "BC", "PMN")
+df$class <- c("wt", "wt", "wt", "ko", "ko", "ko")
+df.melt <- melt(df)
+df.melt$class <- factor(df.melt$class, levels=c("wt", "ko"), ordered=T)
+df.melt$variable <- factor(df.melt$variable, levels=c("GP", "EPM", "LPM", "MY", "MM", "BC", "PMN"), ordered=T)
+ggbarplot(df.melt, x="variable", y="value", add = c("mean_se", "jitter"), palette = c("#d52221", "#2a7ab9"), point.color="gray", color="class", position = position_dodge())
+
+df <- as.data.frame(rbind(c(0.3970,	0.9920,	1.9400,	1.2300),
+                          c(0.3960,	0.9400,	2.2000,	1.0700),
+                          c(0.2780,	0.9750,	1.7000,	0.8110),
+                          c(0.7670,	2.9600,	6.2500,	1.9800),
+                          c(0.5060,	2.1400,	8.9300,	2.0300),
+                          c(0.6150,	2.5800,	8.1300,	2.0700)))
+colnames(df) <- c("MP", "PMO12", "MO1", "MO2")
+df$class <- c("wt", "wt", "wt", "ko", "ko", "ko")
+df.melt <- melt(df)
+df.melt$class <- factor(df.melt$class, levels=c("wt", "ko"), ordered=T)
+df.melt$variable <- factor(df.melt$variable, levels=c("MP", "PMO12", "MO1", "MO2"), ordered=T)
+ggbarplot(df.melt, x="variable", y="value", add = c("mean_se", "jitter"), palette = c("#d52221", "#2a7ab9"), point.color="gray", color="class", position = position_dodge())
+
+df <- as.data.frame(rbind(c(30.6,	17.5,	44.4,	49.9,	3.77,	2.8,	1.36),
+                          c(32.2,	17.6,	38.5,	40.6,	1.82,	0.728,	0.489),
+                          c(36.1,	22.5,	50.2,	58.7,	2.76,	1.14,	0.618),
+                          c(34.6,	24.7,	38.4,	49.2,	21.1,	0, 0),
+                          c(35.4,	25.3,	53.2,	69.7,	23.6,	0, 0),
+                          c(38.2,	19.5,	50.3,	69.4,	26.2,	0, 0)))
+colnames(df) <- c("GP", "PM", "MY1", "MY2", "MM", "BC", "GR")
+df$class <- c("wt", "wt", "wt", "ko", "ko", "ko")
+df.melt <- melt(df)
+df.melt$class <- factor(df.melt$class, levels=c("wt", "ko"), ordered=T)
+df.melt$variable <- factor(df.melt$variable, levels=c("GP", "PM", "MY1", "MY2", "MM", "BC", "GR"), ordered=T)
+ggbarplot(df.melt, x="variable", y="value", add = c("mean_se", "jitter"), palette = c("#d52221", "#2a7ab9"), point.color="gray", color="class", position = position_dodge())
+
+df <- as.data.frame(rbind(c(2.50, 12.25, 13.72),
+                          c(2.50,	12.50, 18.75),
+                          c(2.50,	13.50, 21.60),
+                          c(1.00,	8.75,	100.63),
+                          c(1.00,	8.00,	112.00),
+                          c(1.00,	7.75,	94.94),
+                          c(1.00,	10.75, 123.625),
+                          c(1.00,	10.25, 107.625),
+                          c(1.00,	8.75, 105)
+                    ))
+colnames(df) <- c("d0", "d2", "d4")
+df$class <- c("ewt11", "ewt11", "ewt11", "ertm3", "ertm3", "ertm3", "ebrm56", "ebrm56", "ebrm56")
+df.melt <- melt(df)
+df.melt$class <- factor(df.melt$class, levels=c("ewt11", "ertm3", "ebrm56"), ordered=T)
+df.melt$variable <- factor(df.melt$variable, levels=c("d0", "d2", "d4"), ordered=T)
+ggline(df.melt, x="variable", y="value", add = c("mean_se", "jitter"), color="class", palette=c("#1b9e77", "#d95f02", "#7570b3"), point.color="gray")
+
+df <- as.data.frame(rbind(c(37.45, 40.83,	6.81,	12.1),
+                          c(40.9,	43.5,	8.4, 3.5),
+                          c(41.5,	43.9,	8.1, 3.1),
+                          c(47.44, 32.47,	6.03,	12.43),
+                          c(45.24, 33.96,	7.22,	11.03),
+                          c(48.09, 32.27,	7.14,	10.2),
+                          c(34.03, 16.58,	5.11,	42.4),
+                          c(34.46, 17.57,	4.57,	41.71),
+                          c(33.24, 15.73,	4.4, 45.19)
+                    ))
+colnames(df) <- c("G1", "S", "G2M", "ltG1")
+df$class <- c("d0", "d0", "d0", "d2", "d2", "d2", "d4", "d4", "d4")
+df.melt <- melt(df)
+df.melt$class <- factor(df.melt$class, levels=c("d0", "d2", "d4"), ordered=T)
+df.melt$variable <- factor(df.melt$variable, levels=c("G1", "S", "G2M", "ltG1"), ordered=T)
+p1 <- ggbarplot(df.melt, x="variable", y="value", add = c("mean_se", "jitter"), palette=c("#e41a1c", "#377eb8", "#4daf4a"), point.color="gray", color="class", position = position_dodge())
+
+df <- as.data.frame(rbind(c(33.68, 49.09,	8.15,	3.53),
+                          c(46.25, 39.30,	7.18,	2.31),
+                          c(46.7,	42.1,	8.0,	2.00),
+                          c(31.90,	50.45,	9.73,	2.87),
+                          c(32.24,	50.65,	9.57,	2.32),
+                          c(32.83,	48.51,	10.33,	2.81),
+                          c(32.91,	49.11,	8.49,	2.87),
+                          c(33.01,	48.74,	9.15,	2.30),
+                          c(34.34,	47.62,	9.07,	2.75)
+                    ))
+colnames(df) <- c("G1", "S", "G2M", "ltG1")
+df$class <- c("d0", "d0", "d0", "d2", "d2", "d2", "d4", "d4", "d4")
+df.melt <- melt(df)
+df.melt$class <- factor(df.melt$class, levels=c("d0", "d2", "d4"), ordered=T)
+df.melt$variable <- factor(df.melt$variable, levels=c("G1", "S", "G2M", "ltG1"), ordered=T)
+p2 <- ggbarplot(df.melt, x="variable", y="value", add = c("mean_se", "jitter"), palette=c("#e41a1c", "#377eb8", "#4daf4a"), point.color="gray", color="class", position = position_dodge())
+
+df <- as.data.frame(rbind(c(38.94, 43.88,	9.33,	3.20),
+                          c(47.5,	42.1,	6.2,	1.1),
+                          c(47.6,	41.4,	7.9,	1.1),
+                          c(34.44,	42.82,	12.50, 4.76),
+                          c(33.76,	45.59,	10.75,	5.06),
+                          c(32.90,	46.74,	10.47,	4.21),
+                          c(31.76,	46.07,	11.48,	5.51),
+                          c(30.98,	47.84,	10.31,	5.23),
+                          c(32.21,	44.87,	11.02,	6.44)
+                    ))
+colnames(df) <- c("G1", "S", "G2M", "ltG1")
+df$class <- c("d0", "d0", "d0", "d2", "d2", "d2", "d4", "d4", "d4")
+df.melt <- melt(df)
+df.melt$class <- factor(df.melt$class, levels=c("d0", "d2", "d4"), ordered=T)
+df.melt$variable <- factor(df.melt$variable, levels=c("G1", "S", "G2M", "ltG1"), ordered=T)
+p3 <- ggbarplot(df.melt, x="variable", y="value", add = c("mean_se", "jitter"), palette=c("#e41a1c", "#377eb8", "#4daf4a"), point.color="gray", color="class", position = position_dodge())
+ggarrange(p1, p2, p3, nrow=3, ncol=1)
+dev.off()
 ```
 
