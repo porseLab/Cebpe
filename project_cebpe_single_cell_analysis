@@ -1,0 +1,799 @@
+---
+title: "R Notebook for CEBPE project (revision)"
+output:
+  pdf_document: default
+  html_notebook: default
+editor_options:
+  chunk_output_type: console
+---
+
+```{r global options, include = FALSE}
+knitr::opts_chunk$set(echo=T, include = T, warning=FALSE, message=FALSE, tidy = TRUE, tidy.opts = list(comment = FALSE))
+```
+
+```{r ref.label=knitr::all_labels(), echo = T, eval = F}
+```
+
+# ```{r cachecontrol, cache = TRUE, cache.extra = tools::md5sum(expr_data_norm)}
+# knitr::opts_chunk$set(cache.rebuild = TRUE)
+# ```
+
+#### Load libraries
+```{r}
+library(dplyr)
+library(Seurat)
+library(RColorBrewer)
+library(tidyverse)
+library(Matrix)
+library(ontologyIndex)
+library(patchwork)
+library(preprocessCore)
+library(pheatmap)
+library(edgeR)
+library(ggpubr)
+library(gridExtra)
+library(plyr)
+source("~/software/myScripts/R-scripts/FUNCTIONS.R")
+```
+
+#### analysis of tabula muris (using pre-computed matrices)
+```{r}
+load("~/bric_share/bp_nextgen/09_ALL_PUBLIC/single-cell/mouse/hematopoiesis/tabula_muris/Robj/droplet_Marrow_seurat_tiss.Robj")
+load("~/bric_share/bp_nextgen/09_ALL_PUBLIC/single-cell/mouse/hematopoiesis/tabula_muris/Robj/facs_Marrow_seurat_tiss.Robj")
+tiss_v3 <- UpdateSeuratObject(tiss)
+cell_ontology = get_ontology('https://raw.githubusercontent.com/obophenotype/cell-ontology/master/cl-basic.obo', extract_tags='everything')
+
+VlnPlot(tiss_v3, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+DimPlot(tiss_v3, reduction = "tsne", group.by = "cell_ontology_class", cols=c(DiscretePalette(22, "polychrome")))
+tiss_v3 <- RunUMAP(tiss_v3, dims = 1:17)
+DimPlot(tiss_v3, reduction = "umap", group.by = "cell_ontology_class", cols=c(DiscretePalette(22, "polychrome")))
+DimHeatmap(tiss_v3, dims = 1, cells = 500, balanced = TRUE)
+FeaturePlot(tiss_v3, features = c("Cebpa", "Cebpe"))
+
+length(rownames(tiss_v3))
+table(tiss_v3$cell_ontology_class)
+table(tiss_v3$cluster.ids)
+GetAssayData(object = tiss_v3, slot = "counts")
+```
+
+#### analysis of tabula muris - 10X droplet data (using raw counts)
+```{r}
+gene_counts <- Read10X("~/bric_share/bp_nextgen/09_ALL_PUBLIC/single-cell/mouse/hematopoiesis/tabula_muris/10x_droplet/droplet/Marrow-10X_P7_2/")
+colnames(gene_counts) <- gsub("-1", "", colnames(gene_counts))
+tabula_droplet_channel_1 <- CreateSeuratObject(gene_counts[!grepl("ERCC", row.names(gene_counts)),], project="tabula_muris_P7_2", min.cells=0, min.features=500)
+
+gene_counts <- Read10X("~/bric_share/bp_nextgen/09_ALL_PUBLIC/single-cell/mouse/hematopoiesis/tabula_muris/10x_droplet/droplet/Marrow-10X_P7_3/")
+colnames(gene_counts) <- gsub("-1", "", colnames(gene_counts))
+tabula_droplet_channel_2 <- CreateSeuratObject(gene_counts[!grepl("ERCC", row.names(gene_counts)),], project="tabula_muris_P7_3", min.cells=0, min.features=500)
+
+tabula_droplet <- merge(tabula_droplet_channel_1, y = tabula_droplet_channel_2, add.cell.ids = c("10X_P7_2", "10X_P7_3"), project = "tabula_muris")
+table(tabula_droplet$orig.ident)
+
+meta.data <- read.csv("~/bric_share/bp_nextgen/09_ALL_PUBLIC/single-cell/mouse/hematopoiesis/tabula_muris/10x_droplet/annotations_droplet.csv")
+# length((meta.data[grepl("Marrow", meta.data$tissue),]$cell))
+row.names(meta.data) <- meta.data$cell
+tabula_droplet <- AddMetaData(tabula_droplet, meta.data)
+
+tabula_droplet[["percent.mt"]] <- PercentageFeatureSet(tabula_droplet, pattern = "^MT-")
+
+VlnPlot(tabula_droplet, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+tabula_droplet <- subset(tabula_droplet, subset = nCount_RNA > 1000)
+
+tabula_droplet <- NormalizeData(tabula_droplet, normalization.method = "LogNormalize", scale.factor = 10000)
+#tabula_droplet[["RNA"]]@data
+
+tabula_droplet <- FindVariableFeatures(tabula_droplet, selection.method = "vst", nfeatures = 2000)
+# length(intersect(VariableFeatures(tabula_droplet), VariableFeatures(tiss_v3)))
+VariableFeaturePlot(tabula_droplet)
+
+all.genes <- rownames(tabula_droplet)
+tabula_droplet <- ScaleData(tabula_droplet, features = all.genes)
+tabula_droplet <- RunPCA(tabula_droplet, features = VariableFeatures(object = tabula_droplet))
+DimPlot(tabula_droplet, reduction = "pca", group.by = "cell_ontology_class", cols=c(DiscretePalette(22, "polychrome")))
+
+ElbowPlot(tabula_droplet)
+tabula_droplet <- FindNeighbors(tabula_droplet, dims = 1:14)
+tabula_droplet <- FindClusters(tabula_droplet, resolution = 0.5)
+
+table(Idents(tabula_droplet))
+
+tabula_droplet <- RunUMAP(tabula_droplet, dims = 1:14, seed.use=42)
+DimPlot(tabula_droplet, reduction = "umap", group.by = "cell_ontology_class", cols=c(DiscretePalette(22, "polychrome")))
+FeaturePlot(tabula_droplet, features = c("Cebpa", "Cebpe", "Myc", "Kit", "Gfi1"))
+```
+
+#### analysis of tabula muris - smartSeq2 data (using raw counts)
+```{r}
+gene_counts <- read.csv("~/bric_share/bp_nextgen/09_ALL_PUBLIC/single-cell/mouse/hematopoiesis/tabula_muris/smartSeq2_facs/FACS/Marrow-counts.csv")
+row.names(gene_counts) <- gene_counts[,1]
+gene_counts <- as.matrix(gene_counts[,c(2:ncol(gene_counts))])
+colnames(gene_counts) <- gsub("-1", "", colnames(gene_counts))
+
+tabula_smartseq2 <- CreateSeuratObject(gene_counts[!grepl("ERCC", row.names(gene_counts)),], project="tabula_muris_smartseq2", min.cells=0, min.features=500)
+table(tabula_smartseq2$orig.ident)
+
+meta.data <- read.csv("~/bric_share/bp_nextgen/09_ALL_PUBLIC/single-cell/mouse/hematopoiesis/tabula_muris/smartSeq2_facs/annotations_facs.csv")
+# length((meta.data[grepl("Marrow", meta.data$tissue),]$cell))
+row.names(meta.data) <- meta.data$cell
+tabula_smartseq2 <- AddMetaData(tabula_smartseq2, meta.data[,c(3:ncol(meta.data))])
+
+tabula_smartseq2[["percent.mt"]] <- PercentageFeatureSet(tabula_smartseq2, pattern = "^MT-")
+
+VlnPlot(tabula_smartseq2, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+tabula_smartseq2 <- subset(tabula_smartseq2, subset = nCount_RNA > 1000)
+
+tabula_smartseq2 <- NormalizeData(tabula_smartseq2, normalization.method = "LogNormalize", scale.factor = 10000)
+# head(tabula_smartseq2[["RNA"]]@data)
+
+tabula_smartseq2 <- FindVariableFeatures(tabula_smartseq2, selection.method = "vst", nfeatures = 2000)
+# length(intersect(VariableFeatures(tabula_smartseq2), VariableFeatures(tiss_v3)))
+VariableFeaturePlot(tabula_smartseq2)
+
+all.genes <- rownames(tabula_smartseq2)
+tabula_smartseq2 <- ScaleData(tabula_smartseq2, features = all.genes)
+tabula_smartseq2 <- RunPCA(tabula_smartseq2, features = VariableFeatures(object = tabula_smartseq2))
+DimPlot(tabula_smartseq2, reduction = "pca", group.by = "cell_ontology_class", cols=c(DiscretePalette(22, "polychrome")))
+
+ElbowPlot(tabula_smartseq2)
+tabula_smartseq2 <- FindNeighbors(tabula_smartseq2, dims = 1:23)
+tabula_smartseq2 <- FindClusters(tabula_smartseq2, resolution = 0.5)
+
+table(Idents(tabula_smartseq2))
+
+tabula_smartseq2 <- RunUMAP(tabula_smartseq2, dims = 1:17)
+DimPlot(tabula_smartseq2, reduction = "umap", group.by = "cell_ontology_class", cols=c(DiscretePalette(22, "polychrome")))
+FeaturePlot(tabula_smartseq2, features = c("Cebpa", "Cebpe", "Myc", "Kit"))
+```
+
+#### analysis of Kwok et al. 2020 data (using normalized counts)
+```{r}
+gene_counts <- read.table("~/bric_share/bp_nextgen/09_ALL_PUBLIC/single-cell/mouse/hematopoiesis/kwok_2020/GSE151630_TPM.txt.gz", header=T)
+row.names(gene_counts) <- gene_counts[,1]
+gene_counts <- as.matrix(gene_counts[,c(2:ncol(gene_counts))])
+
+kwock2020 <- CreateSeuratObject(gene_counts[!grepl("ERCC", row.names(gene_counts)),], project="kwock2020", min.cells=0, min.features=500)
+table(kwock2020$orig.ident)
+
+meta.data <- read.table(pipe("cat ~/bric_share/bp_nextgen/09_ALL_PUBLIC/single-cell/mouse/hematopoiesis/kwok_2020/CELL_IDENTITY | sed -E 's/_R.*//g'"))
+colnames(meta.data) <- c("cell", "cell_ontology_class")
+row.names(meta.data) <- meta.data$cell
+kwock2020 <- AddMetaData(kwock2020, meta.data[,c(1:ncol(meta.data))])
+
+kwock2020[["percent.mt"]] <- PercentageFeatureSet(kwock2020, pattern = "^MT-")
+
+VlnPlot(kwock2020, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+kwock2020 <- subset(kwock2020, subset = nCount_RNA > 1000)
+
+kwock2020 <- NormalizeData(kwock2020, normalization.method = "LogNormalize", scale.factor = 10000)
+# head(kwock2020[["RNA"]]@data)
+
+kwock2020 <- FindVariableFeatures(kwock2020, selection.method = "vst", nfeatures = 2000)
+VariableFeaturePlot(kwock2020)
+
+all.genes <- rownames(kwock2020)
+kwock2020 <- ScaleData(kwock2020, features = all.genes)
+kwock2020 <- RunPCA(kwock2020, features = VariableFeatures(object = kwock2020))
+DimPlot(kwock2020, reduction = "pca", group.by = "cell_ontology_class", cols=c(DiscretePalette(7, "polychrome")), label=T)
+
+ElbowPlot(kwock2020)
+kwock2020 <- FindNeighbors(kwock2020, dims = 1:15)
+kwock2020 <- FindClusters(kwock2020, resolution = 1.2)
+
+table(Idents(kwock2020))
+
+kwock2020 <- RunUMAP(kwock2020, dims = 1:15, seed.use = 42)
+DimPlot(kwock2020, reduction = "umap", group.by = "cell_ontology_class", cols=c(DiscretePalette(22, "polychrome")))
+FeaturePlot(kwock2020, features = c("Cebpa", "Cebpe", "Myc", "Kit"))
+```
+
+#### integrated data analysis (tabula droplet and tabula smartseq2)
+```{r}
+features <- SelectIntegrationFeatures(object.list = list( droplet = tabula_droplet, smartseq2 = tabula_smartseq2))
+tabula_anchors <- FindIntegrationAnchors(object.list = list( droplet = tabula_droplet, smartseq2 = tabula_smartseq2), anchor.features = features)
+tabula_combined <- IntegrateData(anchorset = tabula_anchors)
+Assays(tabula_combined)
+DefaultAssay(tabula_combined) <- "integrated"
+
+# Run the standard workflow for visualization and clustering
+tabula_combined <- ScaleData(tabula_combined, verbose = FALSE)
+tabula_combined <- RunPCA(tabula_combined, npcs = 30, verbose = FALSE)
+tabula_combined <- RunUMAP(tabula_combined, reduction = "pca", dims = 1:30)
+tabula_combined <- FindNeighbors(tabula_combined, reduction = "pca", dims = 1:30)
+tabula_combined <- FindClusters(tabula_combined, resolution = 1.2)
+table(tabula_combined@meta.data$seurat_clusters)
+table(tabula_combined@meta.data$cell_ontology_class)
+
+# tabula_combined@meta.data[which(is.na(tabula_combined@meta.data$cell_ontology_class)),]
+
+par(mfrow=c(1,2))
+DimPlot(tabula_combined, reduction = "umap", group.by = "seurat_clusters", cols=c(DiscretePalette(32, "polychrome")))
+DimPlot(tabula_combined, reduction = "umap", group.by = "cell_ontology_class", cols=c(DiscretePalette(28, "polychrome")), label = T)
+FeaturePlot(tabula_combined, features = c("Cebpa", "Cebpe", "Myc", "Kit"), min.cutoff = 0, cols=c("lightgrey", "red"), order=F)
+```
+
+#### integrated data analysis (tabula smartseq2 and kwock et al. 2020)
+```{r}
+features <- SelectIntegrationFeatures(object.list = list( droplet = tabula_smartseq2, kwock = kwock2020))
+tabula_anchors <- FindIntegrationAnchors(object.list = list( droplet = tabula_smartseq2, kwock = kwock2020), anchor.features = features)
+tabula_smartseq2_kwock <- IntegrateData(anchorset = tabula_anchors)
+Assays(tabula_smartseq2_kwock)
+DefaultAssay(tabula_smartseq2_kwock) <- "integrated"
+
+# Run the standard workflow for visualization and clustering
+tabula_smartseq2_kwock <- ScaleData(tabula_smartseq2_kwock, verbose = FALSE)
+tabula_smartseq2_kwock <- RunPCA(tabula_smartseq2_kwock, npcs = 30, verbose = FALSE)
+ElbowPlot(tabula_smartseq2_kwock, ndims = 30)
+tabula_smartseq2_kwock <- RunUMAP(tabula_smartseq2_kwock, reduction = "pca", dims = 1:20)
+tabula_smartseq2_kwock <- FindNeighbors(tabula_smartseq2_kwock, reduction = "pca", dims = 1:20)
+tabula_smartseq2_kwock <- FindClusters(tabula_smartseq2_kwock, resolution = 1)
+table(tabula_smartseq2_kwock@meta.data$seurat_clusters)
+table(tabula_smartseq2_kwock@meta.data$cell_ontology_class)
+
+# tabula_smartseq2_kwock@meta.data[which(is.na(tabula_smartseq2_kwock@meta.data$cell_ontology_class)),]
+
+par(mfrow=c(1,2))
+DimPlot(tabula_smartseq2_kwock, reduction = "umap", group.by = "seurat_clusters", cols=c(DiscretePalette(32, "polychrome")), label = T)
+DimPlot(tabula_smartseq2_kwock, reduction = "umap", group.by = "cell_ontology_class", cols=c(DiscretePalette(28, "polychrome")), label = T)
+
+cell_list <- lapply(unique(kwock2020@meta.data$cell_ontology_class), function(x) WhichCells(tabula_smartseq2_kwock, cells = tabula_smartseq2_kwock@meta.data$cell[which(tabula_smartseq2_kwock@meta.data$cell_ontology_class==x)]))
+names(cell_list) <- unique(kwock2020@meta.data$cell_ontology_class)
+# cell_list[["tabula"]] <- tabula_smartseq2_kwock@meta.data$cell[!tabula_smartseq2_kwock@meta.data$cell_ontology_class %in% unique(kwock2020@meta.data$cell_ontology_class)]
+# c("#1b9e77", "#d95f02", "#7570b3", "#e7298a", "#e6ab02", "#984ea3")
+DimPlot(tabula_smartseq2_kwock, reduction = "umap", group.by = "cell_ontology_class", cols="gray", cells.highlight=cell_list, cols.highlight = rev(colorRampPalette(brewer.pal(6, "Set1"), bias=1)(6)), label = T)
+FeaturePlot(tabula_smartseq2_kwock, features = c("Cebpa", "Cebpe", "Myc", "Kit"), min.cutoff = 0, cols=c("lightgrey", "red"), order=F)
+```
+
+#### integrated data analysis (tabula droplet and kwock et al. 2020)
+```{r}
+features <- SelectIntegrationFeatures(object.list = list( droplet = tabula_droplet, kwock = kwock2020))
+tabula_anchors <- FindIntegrationAnchors(object.list = list( droplet = tabula_droplet, kwock = kwock2020), anchor.features = features)
+tabula_kwock <- IntegrateData(anchorset = tabula_anchors)
+Assays(tabula_kwock)
+DefaultAssay(tabula_kwock) <- "integrated"
+
+# Run the standard workflow for visualization and clustering
+tabula_kwock <- ScaleData(tabula_kwock, verbose = FALSE)
+tabula_kwock <- RunPCA(tabula_kwock, npcs = 30, verbose = FALSE)
+ElbowPlot(tabula_kwock, ndims = 30)
+tabula_kwock <- RunUMAP(tabula_kwock, reduction = "pca", dims = 1:20)
+tabula_kwock <- FindNeighbors(tabula_kwock, reduction = "pca", dims = 1:20)
+tabula_kwock <- FindClusters(tabula_kwock, resolution = 1)
+table(tabula_kwock@meta.data$seurat_clusters)
+table(tabula_kwock@meta.data$cell_ontology_class)
+
+# tabula_kwock@meta.data[which(is.na(tabula_kwock@meta.data$cell_ontology_class)),]
+
+par(mfrow=c(1,2))
+DimPlot(tabula_kwock, reduction = "umap", group.by = "seurat_clusters", cols=c(DiscretePalette(32, "polychrome")), label = T)
+DimPlot(tabula_kwock, reduction = "umap", group.by = "cell_ontology_class", cols=c(DiscretePalette(28, "polychrome")), label = T)
+
+cell_list <- lapply(unique(kwock2020@meta.data$cell_ontology_class), function(x) WhichCells(tabula_kwock, cells = tabula_kwock@meta.data$cell[which(tabula_kwock@meta.data$cell_ontology_class==x)]))
+names(cell_list) <- unique(kwock2020@meta.data$cell_ontology_class)
+# cell_list[["tabula"]] <- tabula_kwock@meta.data$cell[!tabula_kwock@meta.data$cell_ontology_class %in% unique(kwock2020@meta.data$cell_ontology_class)]
+# c("#1b9e77", "#d95f02", "#7570b3", "#e7298a", "#e6ab02", "#984ea3")
+DimPlot(tabula_kwock, reduction = "umap", group.by = "cell_ontology_class", cols="gray", cells.highlight=cell_list, cols.highlight = rev(colorRampPalette(brewer.pal(6, "Set1"), bias=1)(6)), label = T)
+FeaturePlot(tabula_kwock, features = c("Cebpa", "Cebpe", "Myc", "Kit"), min.cutoff = 0, cols=c("lightgrey", "red"), order=F)
+```
+
+#### identify signature genes (using Cebpe project)
+```{r}
+df_cebpe <- read.table("~/bric_share/bp_nextgen/09_ALL_PUBLIC/rna-seq/mouse/hematopoiesis/cebpe/GENE_EXPRESSION.MATRIX.ALLSAMPLES", header=T, comment.char = "")
+df_cebpe <- df_cebpe[,!grepl("BAD|EXTRA", colnames(df_cebpe))]
+df_cebpe <- df_cebpe[,!grepl("_ko|monocytes|granulocytes|mmlike", colnames(df_cebpe))]
+gene_counts <- df_cebpe
+row.names(gene_counts) <- gene_counts[,1]
+gene_counts <- as.matrix(gene_counts[,c(2:ncol(gene_counts))])
+
+cebpe <- CreateSeuratObject(gene_counts[!grepl("ERCC", row.names(gene_counts)),], project="cebpe", min.cells=0, min.features=500)
+table(cebpe$orig.ident)
+
+meta.data <- as.data.frame(cbind(colnames(gene_counts), gsub("_.*", "", colnames(gene_counts))))
+colnames(meta.data) <- c("cell", "cell_ontology_class")
+row.names(meta.data) <- meta.data$cell
+meta.data$cell_ontology_class <- factor(meta.data$cell_ontology_class, levels=unique(meta.data$cell_ontology_class), ordered = T)
+cebpe <- AddMetaData(cebpe, meta.data[,c(1:ncol(meta.data))])
+
+cebpe[["percent.mt"]] <- PercentageFeatureSet(cebpe, pattern = "^MT-")
+
+VlnPlot(cebpe, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+cebpe <- subset(cebpe, subset = nCount_RNA > 1000)
+
+cebpe <- NormalizeData(cebpe, normalization.method = "LogNormalize", scale.factor = 10000)
+# head(cebpe[["RNA"]]@data
+
+cebpe <- FindVariableFeatures(cebpe, selection.method = "vst", nfeatures = 1000)
+VariableFeaturePlot(cebpe)
+
+all.genes <- rownames(cebpe)
+cebpe <- ScaleData(cebpe, features = all.genes)
+cebpe <- RunPCA(cebpe, features = VariableFeatures(object = cebpe), npcs=40)
+ElbowPlot(cebpe)
+cebpe <- FindNeighbors(cebpe, dims = 1:15, k.param = 3)
+cebpe <- FindClusters(cebpe, resolution = 8)
+table(Idents(cebpe))
+dim(unique(cebpe@meta.data[,c("seurat_clusters", "cell_ontology_class")]))
+cebpe@meta.data$seurat_clusters <- as.numeric(as.factor(cebpe@meta.data$cell_ontology_class))
+dim(unique(cebpe@meta.data[,c("seurat_clusters", "cell_ontology_class")]))
+
+DimPlot(cebpe, reduction = "pca", group.by = "seurat_clusters", cols=c(DiscretePalette(15, "polychrome")), label=T)
+DimPlot(cebpe, reduction = "pca", group.by = "cell_ontology_class", cols=c(DiscretePalette(15, "polychrome")), label=T)
+
+cebpe <- RunUMAP(cebpe, dims = 1:15)
+DimPlot(cebpe, reduction = "umap", group.by = "cell_ontology_class", cols=c(DiscretePalette(23, "polychrome")), label = T)
+FeaturePlot(cebpe, features = c("Cebpa", "Cebpe", "Myc", "Kit"))
+
+# test <- subset(FindMarkers(cebpe, only.pos = T, min.pct = 0.25, logfc.threshold = 0.69, ident.1 = 0, ident.2 = c(1:15), test.use = "roc"), myAUC==1)
+# VlnPlot(cebpe, features = "Hlf")
+
+test <- lapply(seq(1,15), function(CLUSTER) tail((genes_cebpe[which(genes_cebpe$cluster==CLUSTER),] %>% arrange(genes_cebpe[which(genes_cebpe$cluster==CLUSTER),]$lsk_cebpa_wt_raw))[,c("gene")],50))
+# RunPCA(tabula_kwock, features = unlist(test), approx=F)
+# DimPlot(tabula_kwock, group.by = "cell_ontology_class", cols=c(DiscretePalette(28, "polychrome")), label = T, reduction = "umap")
+
+ggplot(reshape2::melt(gene_counts[which(row.names(gene_counts) %in% test),]), aes(Var2, log(value))) + geom_boxplot() + theme_bw()
+
+FeaturePlot(tabula_kwock, features = c("Myc"), min.cutoff = 0, cols=c("lightgrey", "red"), order=F)
+```
+
+#### annotate single cells based on gene signatures (ours)
+```{r}
+## https://genomebiology.biomedcentral.com/articles/10.1186/s13059-019-1795-z
+## https://www.sciencedirect.com/science/article/pii/S1074761320302351#app2
+library("SingleR")
+library("celldex")
+library("scRNAseq")
+library("scuttle")
+library("Vennerable")
+
+test.ref <- cebpe[["RNA"]]@data
+test.ref <- test.ref[,!grepl("gmpG_cebpa_wt|gmpM_cebpa_wt", colnames(test.ref))]
+test.test <- tabula_kwock[["RNA"]]@data
+pred <- SingleR(test = test.test, ref = test.ref, assay.type.test = 1, labels=gsub("_.*", "", colnames(test.ref)))
+table(pred$pruned.labels)
+plotScoreHeatmap(pred)
+plotDeltaDistribution(pred)
+summary(!is.na(pred$pruned.labels))
+pruneScores(pred, get.thresholds=TRUE)
+pred[pruneScores(pred, min.diff.med=0.15)==T,]$pruned.labels <- NA
+table(pred$pruned.labels)
+
+tabula_kwock@meta.data$SingleR_pruned.labels <- as.data.frame(pred)[,c("pruned.labels")]
+
+cell_list <- lapply(names(table(pred$pruned.labels)), function(x) WhichCells(tabula_kwock, cells = tabula_kwock@meta.data$cell[which(tabula_kwock@meta.data$SingleR_pruned.labels==x)]))
+names(cell_list) <- names(table(pred$pruned.labels))
+p1 <- DimPlot(tabula_kwock, reduction = "umap", group.by = "SingleR_pruned.labels", cols="gray", cols.highlight =c(DiscretePalette(15, "polychrome"))[3:15], cells.highlight = cell_list, label=T) + ggtitle("Ours")
+p2 <- DimPlot(tabula_kwock, reduction = "umap", group.by = "cell_ontology_class", cols="gray", cells.highlight=cell_list, cols.highlight = rev(colorRampPalette(brewer.pal(6, "Set1"), bias=1)(6)), label = T) + ggtitle("Ours")
+
+pdf("~/project/rna-seq-analysis/analysis_cebpe/pdf/single_cell.pdf")
+p1
+p2
+FeaturePlot(tabula_kwock, features = c("Cebpa", "Cebpe"), min.cutoff = 0, cols=rev(colorBrewer2palette("Spectral", count=30, bias=1)), order=T, keep.scale = "all", label=F)
+dev.off()
+
+gene_list <- list(lsk_pregm = metadata(pred)$de.genes$lsk$pregm, 
+               lsk_gmpG= metadata(pred)$de.genes$lsk$gmpG, 
+               lsk_gmpM= metadata(pred)$de.genes$lsk$gmpM,
+               lsk_epm = metadata(pred)$de.genes$lsk$epm,
+               lsk_gmp = metadata(pred)$de.genes$sk_gmp)
+attr(gplots::venn(gene_list, show.plot=FALSE), "intersections")
+
+Venn(metadata(pred)$de.genes)
+```
+
+#### analysis of kwock data (bulk RNA-seq analysis)
+```{r}
+df_bulk <- read.table("~/bric_share/bp_nextgen/09_ALL_PUBLIC/rna-seq/mouse/hematopoiesis/kwok_2020/GSE151682_genecounts_20200601.bed", header=T)
+mat <- normalize.quantiles(as.matrix(df_bulk[,c(6:25,38)]))
+colnames(mat) <- colnames(df_bulk[,c(6:25,38)])
+plotCustomPCA(mat, 20)
+mat <- cbind(df_bulk$external_gene_name, as.data.frame((do.call(cbind, lapply(unique(gsub("_R.*", "", colnames(df_bulk[,c(6:(ncol(df_bulk)-1))]))), function(x) rowMeans(rle_normalize(df_bulk[,grep(sprintf("^%s", x), colnames(df_bulk))], "none")))))))
+colnames(mat) <- c("gene", unique(gsub("_R.*", "", colnames(df_bulk[,c(6:(ncol(df_bulk)-1))]))))
+df_bulk <- merge(df_bulk, mat, by.x="external_gene_name", by.y="gene")
+plotCustomPCA(df_bulk[,c(40:46)], 6)
+
+## preneu1 vs preneu2
+mat <- as.matrix(df_bulk[,grep("^proneu1_R|^proneu2_R", colnames(df_bulk))])
+rownames(mat) <- df_bulk$external_gene_name
+# mat <- mat[apply(mat, 1, function(x) length(x[x>5]) >= 2),]
+colnames(mat)
+plotCustomPCA(mat, ncol(mat))
+res_proneu <- matrix2deseq2(mat, "wt,wt,wt,ko,ko,ko")
+res_proneu$class <- "neutral"
+res_proneu[which(res_proneu$padj<0.05 & res_proneu$log2FoldChange<0),]$class <- "down"
+res_proneu[which(res_proneu$padj<0.05 & res_proneu$log2FoldChange>0),]$class <- "up"
+table(res_proneu$class)
+df_bulk <- merge(df_bulk, res_proneu[,c("gene", "log2FoldChange", "padj", "class")], by.x="external_gene_name", "gene")
+ggplot(res_proneu, aes(log2FoldChange, -log10(padj))) + geom_point() + theme_bw()
+
+# df_cebpe <- read.table("~/bric_share/bp_nextgen/09_ALL_PUBLIC/rna-seq/mouse/hematopoiesis/cebpe/GENE_EXPRESSION.MATRIX.ALLSAMPLES", header=T, comment.char = "")
+# df_cebpe <- df_cebpe[,!grepl("BAD|EXTRA", colnames(df_cebpe))]
+# df_cebpe <- merge(df_cebpe, df_bulk[,c(6:25,38,39)], by.x="GeneID", by.y="external_gene_name")
+# mat <- normalize.quantiles(as.matrix(df_cebpe[,grep("^gmp_cebpa_wt|^gmpG_wt|^gmpM_wt|^epm_wt|^my_wt|^mmlike_wt|^ly6c_neg_gmp_|^proneu1_", colnames(df_cebpe), value=T)]))
+# colnames(mat) <- colnames(df_cebpe[,grep("^gmp_cebpa_wt|^gmpG_wt|^gmpM_wt|^epm_wt|^my_wt|^mmlike_wt|^ly6c_neg_gmp_|^proneu1_", colnames(df_cebpe), value=T)])
+# plotCustomPCA(mat, 22)
+# pheatmap(cor(mat))
+
+genes_cebpe <- read.table("~/bric_share/bp_nextgen/09_ALL_PUBLIC/rna-seq/mouse/hematopoiesis/cebpe/genes_cebpe.bed", header = T)
+genes_cebpe <- merge(genes_cebpe, df_bulk[,c(1,40:46,53)], by.x="gene", by.y="external_gene_name")
+heatmap_lst <- list()
+mat <- genes_cebpe[which(genes_cebpe$cluster_de!="F_rest"),c(10,11:15,18:20)]
+colnames(mat) <- gsub("_raw", "", colnames(mat))
+heatmap_lst[[1]] <- matrix2pheatmap(mat, genes_cebpe[which(genes_cebpe$cluster_de!="F_rest"),]$cluster, "row")[[4]]
+heatmap_lst[[2]] <- matrix2pheatmap(genes_cebpe[which(genes_cebpe$cluster_de!="F_rest"),c(126:128,130)], genes_cebpe[which(genes_cebpe$cluster_de!="F_rest"),]$cluster, "row")[[4]]
+grid.arrange(arrangeGrob(grobs= heatmap_lst[c(1,2)],ncol=2))
+freqPlot(reshape2::melt(table(genes_cebpe[,c("cluster_de", "class")])), "density") + theme_bw()
+
+p <- lapply(names(table(genes_cebpe$class)), function(x) {
+  t.melt <- (reshape2::melt(genes_cebpe[which(genes_cebpe$class==x),c(31,32,33,35)]))
+  t.melt$class <- gsub("_.*", "", (t.melt$variable))
+  t.melt$variable <- gsub("^[^\\_]*_", "", t.melt$variable)
+  t.melt <- summarySE(t.melt, measurevar = "value", groupvars = c("class", "variable"))
+  t.melt$class <- factor(t.melt$class, levels=c("gmpG", "epm", "lpm", "mm"))
+  ggplot(t.melt, aes(class, value, color=variable)) +
+    geom_errorbar(aes(ymin=value-se, ymax=value+se), width=.1, alpha=1) +
+    geom_line(aes(group=factor(variable), color=factor(variable)), alpha=1) +
+    geom_point(shape = 21, size = 2, fill="white") +
+    scale_color_manual(values=c("#313695", "#a50026")) +
+    theme_bw() + theme(legend.position="top")
+})
+names(p) <- names(genes_cebpe$class)
+grid.arrange(arrangeGrob(grobs= p,ncol=3))
+```
+
+#### cell cycle analysis
+```{r cc-scoring}
+
+# A list of cell cycle markers, from Tirosh et al, 2015, is loaded with Seurat.  We can
+# segregate this list into markers of G2/M phase and markers of S phase
+# s.genes <- cc.genes$s.genes
+# g2m.genes <- cc.genes$g2m.genes
+## updated symbols at cc.genes.updated.2019$s.genes
+
+## Get mapping from : http://www.informatics.jax.org/homology.shtml
+## 'Complete List of Human and Mouse Homologs (plain text)'
+## http://www.informatics.jax.org/downloads/reports/HOM_MouseHumanSequence.rpt  
+dat = read.delim("~/project/rna-seq-analysis/analysis_cebpe//HOM_MouseHumanSequence.rpt")
+# table(dat$Common.Organism.Name, dat$NCBI.Taxon.ID)  # there's only mouse vs human
+map <- dat %>% mutate(org = stringr::str_replace(Common.Organism.Name, ", laboratory", "")) %>% dplyr::select(DB.Class.Key, org, Symbol) %>% distinct() %>% tidyr::pivot_wider(names_from=org, values_from=Symbol, values_fn = list) %>% tidyr::unnest(mouse) %>% tidyr::unnest(human)
+
+m.s.genes = map %>% filter(human %in% cc.genes.updated.2019$s.genes) %>% pull(mouse)
+m.g2m.genes = map %>% filter(human %in% cc.genes.updated.2019$g2m.genes) %>% pull(mouse)
+
+
+# following: https://satijalab.org/seurat/articles/cell_cycle_vignette.html
+
+tabula_kwock <- CellCycleScoring(tabula_kwock, s.features = m.s.genes, g2m.features = m.g2m.genes, set.ident = FALSE)
+
+tabula_kwock$CC.Difference <- tabula_kwock$S.Score - tabula_kwock$G2M.Score
+
+# view cell cycle scores and phase assignments
+# head(tabula_kwock[[]]) %>% dplyr::select(seurat_clusters, SingleR, S.Score, G2M.Score, Phase)
+
+## plot #cells in each phase per cluster:
+pdf("~/project/rna-seq-analysis/analysis_cebpe/pdf/single_cell_cell_cycle.pdf")
+df.melt <- reshape2::melt(table(tabula_kwock[[]][,c("SingleR_pruned.labels", "Phase")]))
+colnames(df.melt) <- c("xlabels", "class", "freq")
+total <- as.vector(unlist(ddply(df.melt, .(xlabels), summarise, X2=sum(freq))[2]))
+df.melt$total <- rep(total, length(df.melt[,1])/length(total))
+df.melt$density <- df.melt$freq/df.melt$total
+df.melt$xlabels <- factor(df.melt$xlabels, levels=c("gmpG", "epm", "lpm", "my", "mm", "bc", "pmn", 
+                                                    "gmpM", "pmo1", "pmo2", "mo1", "mo2"), ordered=T)
+ggplot(df.melt, aes(xlabels, density, fill=factor(class), label = freq)) + 
+      geom_bar(stat="identity", position = "stack") +
+      ggtitle("") +
+      geom_text(size = 3, position = position_stack(vjust = 0.5)) + theme_bw() +
+      theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  scale_fill_manual(values=c("#7570b3", "#1b9e77", "#d95f02"))
+DimPlot(tabula_kwock, group.by = "Phase", cols =c("#7570b3", "#1b9e77", "#d95f02"))
+FeaturePlot(tabula_kwock, features = c("Cdk4", "Cdk1"), min.cutoff = 0, cols=rev(colorBrewer2palette("Spectral", count=30, bias=1)), order=T, keep.scale = "all", label=F)
+FeaturePlot(tabula_kwock, features = "CC.Difference"
+            , min.cutoff="q5", max.cutoff="q95"
+            #, min.cutoff="-0.5", max.cutoff="0.5"
+            ) +
+  scale_color_viridis_c()
+dev.off()
+```
+
+#### Xie et al. single cell data analysis
+```{r}
+## Single-cell data
+xie_bm1 <- data.table::fread("/localhome/bric/xfd783/project/chip-seq-analysis/analysis_cebpe/xie_2020/GSM4081545_wt_ctl_bm1.tab")
+xie_bm1 <- as.data.frame(xie_bm1)
+row.names(xie_bm1) <- xie_bm1$V1
+xie_bm1$V1 <- NULL
+
+xie_bm2 <- data.table::fread("/localhome/bric/xfd783/project/chip-seq-analysis/analysis_cebpe/xie_2020/GSM4081546_wt_ctl_bm2.tab")
+xie_bm2 <- as.data.frame(xie_bm2)
+row.names(xie_bm2) <- xie_bm2$V1
+xie_bm2$V1 <- NULL
+
+xie_anno <- read.table("~/project/chip-seq-analysis/analysis_cebpe/xie_2020/GSE137539_Mouse_WT_blank_meta.txt", header=T)
+xie_anno$cell_id <- gsub("^.*_+", "", row.names(xie_anno))
+
+xie_genes <- read.table("~/project/chip-seq-analysis/analysis_cebpe/xie_2020/xie_de_genes.txt")
+colnames(xie_genes) <- c("cluster", "gene")
+xie_genes <- xie_genes[which(xie_genes$cluster %in%  c("G0", "G1", "G2", "G3", "G4", "G5a", "G5b", "G5c", "GM")),]
+xie_genes <- xie_genes[order(xie_genes$cluster, xie_genes$gene),]
+xie_genes <- xie_genes[match(unique(xie_genes$gene), xie_genes$gene),]
+
+xie_expr <- lapply(c("G0", "G1", "G2", "G3", "G4", "G5a", "G5b", "G5c", "GM"), function(x) {
+                rowMeans(cbind(xie_bm1[,which(colnames(xie_bm1) %in% c(xie_anno[which(xie_anno$cluster==x),]$cell_id))], 
+                               xie_bm2[,which(colnames(xie_bm2) %in% c(xie_anno[which(xie_anno$cluster==x),]$cell_id))]))
+            })
+names(xie_expr) <- c("G0", "G1", "G2", "G3", "G4", "G5a", "G5b", "G5c", "GM")
+xie_expr <- as.data.frame(xie_expr)
+
+mat <- merge(xie_expr, xie_genes, by.x="row.names", by.y="gene")
+row.names(mat) <- mat$Row.names
+mat$Row.names <- NULL
+mat <- mat[order(mat$cluster),]
+
+ggarrange(matrix2Heatmap(mat[,c(1:9)], scale="row"))
+
+## Build RNA-seq data (identify signatures)
+xie_expr_bulk <- read.table("~/project/chip-seq-analysis/analysis_cebpe/xie_2020/GSE137538_2019Granulocyte_bulk_matrix.tab", header=T)
+xie_expr_bulk <- xie_expr_bulk[,c(ncol(xie_expr_bulk), 2:(ncol(xie_expr_bulk)-1))]
+colnames(xie_expr_bulk) <- gsub("_X.*", "", gsub("^X[0-9]+_", "", colnames(xie_expr_bulk)))
+xie_expr_bulk <- xie_expr_bulk[match(unique(xie_expr_bulk$external_gene_name), xie_expr_bulk$external_gene_name),]
+row.names(xie_expr_bulk) <- xie_expr_bulk$external_gene_name
+xie_expr_bulk$external_gene_name <- NULL
+colnames(xie_expr_bulk) <- c("NEU_rep1", "NEU_rep2", "NEU_rep3", "MB_rep1", "MB_rep2", "MB_rep3", "MC_rep1", "MC_rep2", "MC_rep3", "MM_rep1", "MM_rep2", "MM_rep3", "PM_rep1", "PM_rep2", "PM_rep3")
+```
+
+#### annotate single cells based on gene signatures (Xie et al.)
+```{r}
+## https://genomebiology.biomedcentral.com/articles/10.1186/s13059-019-1795-z
+## https://www.sciencedirect.com/science/article/pii/S1074761320302351#app2
+library("SingleR")
+library("celldex")
+library("scRNAseq")
+library("scuttle")
+library("Vennerable")
+
+## annotate using bulk RNA-seq data from Xie et al.
+test.ref <- xie_expr_bulk[which(row.names(xie_expr_bulk) %in% row.names(mat)),]
+# test.ref <- xie[["RNA"]]@data
+test.test <- tabula_kwock[["RNA"]]@data
+pred <- SingleR(test = test.test, ref = test.ref, assay.type.test = 1, labels=gsub("_.*$", "", colnames(test.ref)))
+
+table(pred$pruned.labels)
+plotScoreHeatmap(pred)
+plotDeltaDistribution(pred)
+summary(!is.na(pred$pruned.labels))
+pruneScores(pred, get.thresholds=TRUE)
+pred[pruneScores(pred, min.diff.med=0.08)==T,]$pruned.labels <- NA
+table(pred$pruned.labels)
+
+tabula_kwock@meta.data$SingleR_pruned.labels <- as.data.frame(pred)[,c("pruned.labels")]
+
+tabula_kwock@meta.data[which(tabula_kwock@meta.data$SingleR_pruned.labels=="MB" & tabula_kwock@meta.data$CC.Difference < 0.5),]$SingleR_pruned.labels = NA
+table(tabula_kwock@meta.data$SingleR_pruned.labels)
+cell_list <- lapply(names(table(pred$pruned.labels)), function(x) WhichCells(tabula_kwock, cells = tabula_kwock@meta.data$cell[which(tabula_kwock@meta.data$SingleR_pruned.labels==x)]))
+names(cell_list) <- names(table(pred$pruned.labels))
+p3 <- DimPlot(tabula_kwock, reduction = "umap", group.by = "SingleR_pruned.labels", cols="gray", cols.highlight =c(DiscretePalette(15, "polychrome"))[3:15], cells.highlight = cell_list, label=T) + ggtitle("Xie et al.")
+# DimPlot(tabula_kwock, reduction = "umap", group.by = "cell_ontology_class", cols="gray", cells.highlight=cell_list, cols.highlight = rev(colorRampPalette(brewer.pal(6, "Set1"), bias=1)(6)), label = T)
+# FeaturePlot(tabula_kwock, features = c("Cebpa", "Cebpe"), min.cutoff = 0, cols=rev(colorBrewer2palette("Spectral", count=30, bias=1)), order=T, keep.scale = "all", label=F)
+
+## annotate using single RNA-seq data from Xie et al.
+test.ref <- mat[,c(1:9)]
+test.test <- tabula_kwock[["RNA"]]@data
+pred <- SingleR(test = test.test, ref = test.ref, assay.type.test = 1, labels=colnames(test.ref))
+
+table(pred$pruned.labels)
+plotScoreHeatmap(pred)
+plotDeltaDistribution(pred)
+summary(!is.na(pred$pruned.labels))
+pruneScores(pred, get.thresholds=TRUE)
+pred[pruneScores(pred, min.diff.med=0.08)==T,]$pruned.labels <- NA
+table(pred$pruned.labels)
+
+tabula_kwock@meta.data$SingleR_pruned.labels <- as.data.frame(pred)[,c("pruned.labels")]
+
+tabula_kwock@meta.data[which(tabula_kwock@meta.data$SingleR_pruned.labels=="G0" & tabula_kwock@meta.data$CC.Difference < 0.4),]$SingleR_pruned.labels = NA
+table(tabula_kwock@meta.data$SingleR_pruned.labels)
+cell_list <- lapply(names(table(pred$pruned.labels)), function(x) WhichCells(tabula_kwock, cells = tabula_kwock@meta.data$cell[which(tabula_kwock@meta.data$SingleR_pruned.labels==x)]))
+names(cell_list) <- names(table(pred$pruned.labels))
+p4 <- DimPlot(tabula_kwock, reduction = "umap", group.by = "SingleR_pruned.labels", cols="gray", cols.highlight =c(DiscretePalette(15, "polychrome"))[3:15], cells.highlight = cell_list, label=T) + ggtitle("Xie et al. (Single cell)")
+```
+
+#### Kwock et al. data analysis
+```{r}
+## Build RNA-seq data (identify signatures)
+kwock_expr_bulk <- read.table("~/project/chip-seq-analysis/analysis_cebpe/kwock_2020/GSE151682_genecounts_20200601.tab", header=T)
+kwock_expr_bulk <- kwock_expr_bulk[,c(35,2:21,34)]
+colnames(kwock_expr_bulk) <- c("gene", "ly6c_neg_gmp_rep1", "ly6c_neg_gmp_rep2", "ly6c_neg_gmp_rep3", "proneu1_rep1", "proneu1_rep2", "proneu1_rep3", "proneu2_rep1", "proneu2_rep2", "proneu2_rep3", "preneu_rep1", "preneu_rep2", "preneu_rep3", "cmop_rep1", "cmop_rep2", "cmop_rep3", "tpmo_rep1", "tpmo_rep2", "tpmo_rep3", "ly6chi_mo_rep1", "ly6chi_mo_rep2", "ly6chi_mo_rep3")
+kwock_expr_bulk <- kwock_expr_bulk %>% group_by(gene) %>% summarise_all(sum) %>% as.data.frame()
+row.names(kwock_expr_bulk) <- kwock_expr_bulk$gene
+kwock_expr_bulk$gene <- NULL
+```
+
+#### annotate single cells based on gene signatures (Kwock et al.)
+```{r}
+## https://genomebiology.biomedcentral.com/articles/10.1186/s13059-019-1795-z
+## https://www.sciencedirect.com/science/article/pii/S1074761320302351#app2
+library("SingleR")
+library("celldex")
+library("scRNAseq")
+library("scuttle")
+library("Vennerable")
+
+## annotate using bulk RNA-seq data from Xie et al.
+test.ref <- kwock_expr_bulk[,c(1:18)]
+test.test <- tabula_kwock[["RNA"]]@data
+pred <- SingleR(test = test.test, ref = test.ref, assay.type.test = 1, labels=gsub("_.*$", "", colnames(test.ref)))
+
+table(pred$pruned.labels)
+plotScoreHeatmap(pred)
+plotDeltaDistribution(pred)
+summary(!is.na(pred$pruned.labels))
+pruneScores(pred, get.thresholds=TRUE)
+pred[pruneScores(pred, min.diff.med=0.04)==T,]$pruned.labels <- NA
+table(pred$pruned.labels)
+
+tabula_kwock@meta.data$SingleR_pruned.labels <- as.data.frame(pred)[,c("pruned.labels")]
+
+tabula_kwock@meta.data[which(tabula_kwock@meta.data$SingleR_pruned.labels=="cmop" & tabula_kwock@meta.data$CC.Difference < 0.5),]$SingleR_pruned.labels = NA
+table(tabula_kwock@meta.data$SingleR_pruned.labels)
+
+cell_list <- lapply(names(table(pred$pruned.labels)), function(x) WhichCells(tabula_kwock, cells = tabula_kwock@meta.data$cell[which(tabula_kwock@meta.data$SingleR_pruned.labels==x)]))
+names(cell_list) <- names(table(pred$pruned.labels))
+# pdf("~/project/rna-seq-analysis/analysis_cebpe/pdf/single_cell.pdf")
+p5 <- DimPlot(tabula_kwock, reduction = "umap", group.by = "SingleR_pruned.labels", cols="gray", cols.highlight =c(DiscretePalette(8, "polychrome"))[3:11], cells.highlight = cell_list, label=T) + ggtitle("Kwock et al.")
+# DimPlot(tabula_kwock, reduction = "umap", group.by = "cell_ontology_class", cols="gray", cells.highlight=cell_list, cols.highlight = rev(colorRampPalette(brewer.pal(6, "Set1"), bias=1)(6)), label = T)
+# FeaturePlot(tabula_kwock, features = c("Cebpa", "Cebpe"), min.cutoff = 0, cols=rev(colorBrewer2palette("Spectral", count=30, bias=1)), order=T, keep.scale = "all", label=F)
+```
+
+#### Evrard et al. data analysis
+```{r}
+## Build RNA-seq data (identify signatures)
+evrard_expr_bulk <- read.table("~/project/chip-seq-analysis/analysis_cebpe/evrard_2018/GSE109467_readCount_renamed_geneName.tab", header=T)
+evrard_expr_bulk <- evrard_expr_bulk[,c("gene_name", grep("GMP", colnames(evrard_expr_bulk), value=T), grep("PN", colnames(evrard_expr_bulk), value=T), grep("EN", colnames(evrard_expr_bulk), value=T), grep("LN", colnames(evrard_expr_bulk), value=T))]
+evrard_expr_bulk <- evrard_expr_bulk %>% group_by(gene_name) %>% summarise_all(sum) %>% as.data.frame()
+row.names(evrard_expr_bulk) <- evrard_expr_bulk$gene_name
+evrard_expr_bulk$gene_name <- NULL
+```
+
+#### annotate single cells based on gene signatures (Evrard et al.)
+```{r}
+## https://genomebiology.biomedcentral.com/articles/10.1186/s13059-019-1795-z
+## https://www.sciencedirect.com/science/article/pii/S1074761320302351#app2
+library("SingleR")
+library("celldex")
+library("scRNAseq")
+library("scuttle")
+library("Vennerable")
+
+## annotate using bulk RNA-seq data from Evard et al.
+mat <- merge(evrard_expr_bulk, kwock_expr_bulk, by="row.names")
+row.names(mat) <- mat$Row.names
+mat$Row.names <- NULL
+test.ref <- mat[,c(1:30)]
+# test.ref <- evrard_expr_bulk
+test.test <- tabula_kwock[["RNA"]]@data
+pred <- SingleR(test = test.test, ref = test.ref, assay.type.test = 1, labels=gsub("_.*$", "", colnames(test.ref)))
+
+table(pred$pruned.labels)
+plotScoreHeatmap(pred)
+plotDeltaDistribution(pred)
+summary(!is.na(pred$pruned.labels))
+pruneScores(pred, get.thresholds=TRUE)
+# pred[pruneScores(pred, min.diff.med=0.05)==T,]$pruned.labels <- NA
+table(pred$pruned.labels)
+
+tabula_kwock@meta.data$SingleR_pruned.labels <- as.data.frame(pred)[,c("pruned.labels")]
+
+tabula_kwock@meta.data[which(tabula_kwock@meta.data$SingleR_pruned.labels=="cmop" & tabula_kwock@meta.data$CC.Difference < 0.5),]$SingleR_pruned.labels = NA
+table(tabula_kwock@meta.data$SingleR_pruned.labels)
+
+cell_list <- lapply(names(table(pred$pruned.labels)), function(x) WhichCells(tabula_kwock, cells = tabula_kwock@meta.data$cell[which(tabula_kwock@meta.data$SingleR_pruned.labels==x)]))
+names(cell_list) <- names(table(pred$pruned.labels))
+# pdf("~/project/rna-seq-analysis/analysis_cebpe/pdf/single_cell.pdf")
+p6 <- DimPlot(tabula_kwock, reduction = "umap", group.by = "SingleR_pruned.labels", cols="gray", cols.highlight =c(DiscretePalette(15, "polychrome"))[3:15], cells.highlight = cell_list, label=T) + ggtitle("Evrard et al. + Kwock et al.")
+p6
+# DimPlot(tabula_kwock, reduction = "umap", group.by = "cell_ontology_class", cols="gray", cells.highlight=cell_list, cols.highlight = rev(colorRampPalette(brewer.pal(6, "Set1"), bias=1)(6)), label = T)
+# FeaturePlot(tabula_kwock, features = c("Cebpa", "Cebpe"), min.cutoff = 0, cols=rev(colorBrewer2palette("Spectral", count=30, bias=1)), order=T, keep.scale = "all", label=F)
+```
+
+#### Muench et al. single cell data analysis
+```{r}
+## Single-cell data
+muench_cite <- data.table::fread("/localhome/bric/xfd783/project/chip-seq-analysis/analysis_cebpe/muench_2020/GSE120365_Combined-counts.tab")
+muench_cite <- as.data.frame(muench_cite)
+muench_cite <- muench_cite[,c("external_gene_name", colnames(muench_cite)[2:(ncol(muench_cite)-1)])]
+muench_cite <- muench_cite %>% group_by(external_gene_name) %>% summarise_all(sum) %>% as.data.frame()
+row.names(muench_cite) <- muench_cite$external_gene_name
+muench_cite$external_gene_name <- NULL
+
+muench_anno <- read.table("~/project/chip-seq-analysis/analysis_cebpe/muench_2020/GSE120365_GMP-P_CITE-Seq-clusters.txt.gz", header=F)
+colnames(muench_anno) <- c("cell_id", "cluster")
+
+muench_expr <- lapply(unique(muench_anno$cluster), function(x) {
+                rowMeans(muench_cite[,which(colnames(muench_cite) %in% c(muench_anno[which(muench_anno$cluster==x),]$cell_id))])
+            })
+names(muench_expr) <- unique(muench_anno$cluster)
+muench_expr <- as.data.frame(muench_expr)
+```
+
+#### annotate single cells based on gene signatures (Muench et al.)
+```{r}
+## https://genomebiology.biomedcentral.com/articles/10.1186/s13059-019-1795-z
+## https://www.sciencedirect.com/science/article/pii/S1074761320302351#app2
+library("SingleR")
+library("celldex")
+library("scRNAseq")
+library("scuttle")
+library("Vennerable")
+
+## annotate using single RNA-seq data from Muench et al.
+test.ref <- muench_expr
+test.test <- tabula_kwock[["RNA"]]@data
+pred <- SingleR(test = test.test, ref = test.ref, assay.type.test = 1, labels=colnames(test.ref))
+
+table(pred$pruned.labels)
+plotScoreHeatmap(pred)
+plotDeltaDistribution(pred)
+summary(!is.na(pred$pruned.labels))
+pruneScores(pred, get.thresholds=TRUE)
+pred[pruneScores(pred, min.diff.med=0.05)==T,]$pruned.labels <- NA
+table(pred$pruned.labels)
+
+tabula_kwock@meta.data$SingleR_pruned.labels <- as.data.frame(pred)[,c("pruned.labels")]
+
+# tabula_kwock@meta.data[which(tabula_kwock@meta.data$SingleR_pruned.labels=="G0" & tabula_kwock@meta.data$CC.Difference < 0.4),]$SingleR_pruned.labels = NA
+# table(tabula_kwock@meta.data$SingleR_pruned.labels)
+
+cell_list <- lapply(names(table(pred$pruned.labels)), function(x) WhichCells(tabula_kwock, cells = tabula_kwock@meta.data$cell[which(tabula_kwock@meta.data$SingleR_pruned.labels==x)]))
+names(cell_list) <- names(table(pred$pruned.labels))
+p7 <- DimPlot(tabula_kwock, reduction = "umap", group.by = "SingleR_pruned.labels", cols="gray", cols.highlight =c(DiscretePalette(25, "polychrome"))[3:20], cells.highlight = cell_list, label=T) + ggtitle("Muench et al. (2020; Single cell)")
+```
+
+## heatmap of correlation between gene expression profiles of different cell populations
+```{r}
+
+MyMerge <- function(x, y){
+  df <- merge(x, y, by= "row.names")
+  row.names(df) <- df$Row.names
+  df$Row.names <- NULL
+  return(df)
+}
+test <- Reduce(MyMerge, list(gene_counts, evrard_expr_bulk, kwock_expr_bulk, xie_expr_bulk))
+test_mean <- lapply(unique(gsub("[_.]+.*", "", colnames(test))), function(x) {
+                rowMeans(test[,grep(sprintf("^%s", x), colnames(test), value=T)])
+            })
+names(test_mean) <- unique(gsub("[_.]+.*", "", colnames(test)))
+test_mean <- as.data.frame(test_mean)
+# test_mean <- merge(test_mean, muench_expr, by.x="row.names", by.y="row.names")
+# row.names(test_mean) <- test_mean$Row.names
+# test_mean$Row.names <- NULL
+
+mat <- normalize.quantiles(as.matrix(test_mean))
+colnames(mat) <- colnames(test_mean)
+mat <- cor(mat, method="spearman")
+h1 <- ggarrange(matrix2Heatmap(mat[c("mo2","mo1","pmo2","pmo1","gmpM","gmp","gmpG","epm","lpm","my","mm","bc","pmn"),
+                                   c("tpmo","cmop","ly6c","proneu1","proneu2","preneu","PN","EN","LN")], 
+                               clusterRows = F, clusterCols = F, displayN = F, scale="none", title = "Ervard + Kwock et al."))
+h2 <- ggarrange(matrix2Heatmap(mat[c("mo2","mo1","pmo2","pmo1","gmpM","gmp","gmpG","epm","lpm","my","mm","bc","pmn"),
+                                   c(unique(gsub("[_.]+.*", "", colnames(xie_expr_bulk)))[c(2,5,3,4,1)])], clusterRows = F, clusterCols = F, 
+                               title="Xie et al.", displayN = F, scale = "none"))
+h3 <- ggarrange(matrix2Heatmap(mat[c("mo2","mo1","pmo2","pmo1","gmpM","gmp","gmpG","epm","lpm","my","mm","bc","pmn"),
+                                   c("mo2","mo1","pmo2","pmo1","gmpM","gmp","gmpG","epm","lpm","my","mm","bc","pmn")], 
+                               clusterRows = F, clusterCols = F, displayN = F, scale="none", title="Ours"))
+# h4 <- ggarrange(matrix2Heatmap(mat[c(1:15),c(colnames(muench_expr))], clusterRows = F, clusterCols = F, title="Muench et al.", displayN = F))
+```
+
+
+```{r}
+pdf("~/project/chip-seq-analysis/analysis_cebpe/pdf/benchmark.pdf", width=15, height=8)
+ggarrange(p6, p3, p1, h1, h2, h3, nrow=2, ncol=3, labels=c("A", "B", "C", "D", "E", "F"))
+dev.off()
+```
+
+## analyse proteomics data
+```{r}
+df <- read.csv("~/project/rna-seq-analysis/analysis_cebpe/quant_results.csv")
+df$Celltype <- factor(df$Celltype, levels=c("WT_GP", "WT_PM", "WT_MY1", "WT_MY2", "WT_MM", "WT_BCPMN", "KO_GP", "KO_PM", "KO_MY", "KO_MM"), ordered=T)
+df$class <- sprintf("%s_%s_%s", df$Protein, df$Peptide, df$bio_rep)
+pdf("~/project/rna-seq-analysis/analysis_cebpe/pdf/proteomics.pdf", width=6, height=2)
+ggplot(df, aes(Celltype, Copy.number, group=class, color=class)) + geom_line(aes(linetype=bio_rep)) + geom_point() + theme_bw() +
+  scale_color_manual(values=c(colorBrewer2palette(name="Blues", count = 8)[5:8], colorBrewer2palette(name="Reds", count = 8)[5:8]))
+dev.off()
+```
